@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <TreatWarningsAsErrors>False</TreatWarningsAsErrors>
+    <WarningsAsErrors>$(WarningsAsErrors);NU1605</WarningsAsErrors>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>rulealize</ToolCommandName>
+    <PackageId>Rulealize.Cli</PackageId>
+    <Version>0.1.0</Version>
+    <Authors>Reny</Authors>
+    <Description>Materialises the plugin folder a Rulealize rule set's `requires` calls for.</Description>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <RepositoryUrl>https://github.com/reny-develop/Rulealize.Cli</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <!--
+    Rulealize is here for two things and neither is evaluation: PluginRequirement reads a
+    document's requires, and PluginResolution decides which versions it calls for. Both are
+    pure, and the reason they are not reimplemented here is that a second reading of ^1.0
+    would eventually differ from the runtime's, and the way it would show is this tool
+    assembling a folder the runtime then refuses.
+  -->
+  <ItemGroup>
+    <PackageReference Include="Rulealize" Version="0.2.0" />
+  </ItemGroup>
+
+</Project>
