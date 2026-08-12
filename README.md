@@ -12,13 +12,11 @@ rulealize restore reversi.json
   Rulealize.Plugin.Arithmetic 1.0.0
   Rulealize.Plugin.Binding 1.0.0
   …
-10 plugins → plugin
+10 plugins -> plugin
 'reversi.json' compiles against it.
 ```
 
-> **Status — not published.** It needs `PluginRequirement` and `PluginResolution`, which are
-> in Rulealize 0.2.0, and 0.2.0 is not on nuget.org yet. Until it is, build from source with
-> the repositories cloned side by side and `dotnet pack Rulealize/src -o LocalNuGet`.
+Requires `net10.0` and the .NET SDK, which a `dotnet tool` implies.
 
 ## Why
 

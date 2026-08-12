@@ -112,7 +112,9 @@ foreach (ResolvedPlugin plugin in resolution.Plugins)
     Console.WriteLine($"  {plugin}");
 }
 
-Console.WriteLine($"{resolution.Plugins.Length} plugins → {outputFolder}");
+// ASCII, deliberately. A console writes in the machine's codepage, and this line is the one
+// most likely to be redirected into a log read somewhere else.
+Console.WriteLine($"{resolution.Plugins.Length} plugins -> {outputFolder}");
 
 // The folder is only right if it runs the document, and the way to find out is the way the
 // application will do it. This costs one compile and turns "the packages downloaded" into
