@@ -12,10 +12,106 @@ dotnet tool install -g Rulealize.Cli
 | `rulealize restore <rule set>` | fetch what the document's `requires` names, into a folder |
 | `rulealize plugins` | what a folder of vocabularies provides, or why it provides nothing |
 | `rulealize check <rule set>` | does this document compile against that folder |
+| `rulealize moves <rule set>` | what is legal from a position |
+| `rulealize apply <rule set> <input>` | apply one, and write the state it reached |
+| `rulealize play <rule set>` | walk it, holding the position in memory |
 
-All three take `--plugins <folder>`, and it defaults to `plugin`.
+```
+--plugins <folder>   where the vocabularies are        (default 'plugin')
+--state <file>       the position to start from        (default the rule set's own)
+--limit <n>          candidates GetValidInputs may try (default 10000)
+--write              amend --state in place instead of writing to standard output
+--json               moves, as the runtime writes them
+```
 
 Requires `net10.0` and the .NET SDK, which a `dotnet tool` implies.
+
+## Trying a rule set
+
+```
+$ rulealize restore reversi.json
+10 plugins -> plugin
+'reversi.json' compiles against it.
+
+$ rulealize play reversi.json
+reversi@1.0.0 from the initial state
+Choose by number. 'state' prints the position, 'q' stops.
+
+    1. place(at: e6)
+    2. place(at: f5)
+    3. place(at: c4)
+    4. place(at: d3)
+> 4
+
+    1. place(at: c5)
+    2. place(at: c3)
+    3. place(at: e3)
+>
+```
+
+Two commands, no host program, and no file written but the plugin folder.
+
+## Where the state lives
+
+**Nowhere, until you say.** `ApplyToState` is a function of the state it was handed, and a
+`RuleContext` holds a rule set and no position at all, so every command here has to be told
+where a position comes from and told what to do with the one it produced. There is no hidden
+current game.
+
+| | |
+| --- | --- |
+| told nothing | the rule set's own `state.initial`, which is the document's opening position and not this tool's invention. The line above the answer says which was used |
+| `--state <file>` | that document |
+| the new state | standard output, so that redirecting gives a state document and nothing else |
+| `--write` | amend `--state` in place instead, which is one file name for a sequence of moves rather than one per move |
+| `play` | memory, and then gone |
+
+```sh
+rulealize apply reversi.json "place(at: d3)" > s1.json
+rulealize moves reversi.json --state s1.json
+```
+
+## Naming an input
+
+An input is named the way `moves` prints it, and the round trip is the runtime's own:
+nothing here parses that text. The legal inputs are enumerated and the one whose text matches
+is asked for its document, so **what can be named is exactly what was offered**.
+
+```
+$ rulealize apply reversi.json "place(at: a1)"
+'place(at: a1)' is not legal from the initial state.
+These are:
+  place(at: e6)
+  place(at: f5)
+  place(at: c4)
+  place(at: d3)
+```
+
+Which leaves the one thing this cannot express — an input the rule set ought to refuse, and
+checking that it does — to `--input <file>` and a written document.
+
+## `moves`
+
+The moves go to standard output, one per line, and everything about them to standard error.
+A count is not a move.
+
+```
+$ rulealize moves reversi.json
+reversi@1.0.0 from the initial state (ongoing)        <- standard error
+place(at: e6)
+place(at: f5)
+place(at: c4)
+place(at: d3)
+4 legal inputs, 65 candidates evaluated               <- standard error
+```
+
+`GetValidInputs` stops at a limit rather than searching for as long as it takes, so a short
+list can mean the position or it can mean the limit. **It always says which**, because the
+worst failure this command has is a truncated answer that looks complete.
+
+```
+truncated at 2 candidates -- pass --limit to raise it
+```
 
 ## The folder is the seam
 
