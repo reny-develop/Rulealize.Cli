@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0.
 
 using Rulealize;
+using Rulealize.Abstraction;
 
 namespace Rulealize.Cli
 {
@@ -71,15 +72,33 @@ namespace Rulealize.Cli
                 return 1;
             }
 
-            if (Session.Guarded(
-                    () => session.Context.ApplyToState(inputDocument, session.State),
-                    out TransitionResult? result) is not 0)
+            // Applied here rather than through Session.Guarded, which reports every failure
+            // the same way. A refusal is not a failure of the same kind, and this is the one
+            // command with something better to say about it.
+            TransitionResult result;
+
+            try
             {
+                result = session.Context.ApplyToState(inputDocument, session.State);
+            }
+            catch (IllegalInputException refused)
+            {
+                // Not a malformed document and not a fault: everything read and evaluated
+                // cleanly, and the rule set's answer was no. Arriving here through --input is
+                // the supported way of asking whether it says no, so the refusal is reported
+                // as the answer it is -- with a non-zero status, because no state came of it.
+                Console.Error.WriteLine($"refused from {session.Source}: {refused.Message}");
+                Report(session, limit);
+                return 1;
+            }
+            catch (Exception failure) when (failure is RuleDocumentException or RuleEvaluationException)
+            {
+                Console.Error.WriteLine(failure.Message);
                 return 1;
             }
 
             Console.Error.WriteLine($"{named ?? inputPath} applied to {session.Source}"
-                + (result!.IsTerminal ? $" -- terminal{(result.Result is null ? string.Empty : $" ({result.Result})")}" : string.Empty));
+                + (result.IsTerminal ? $" -- terminal{(result.Result is null ? string.Empty : $" ({result.Result})")}" : string.Empty));
 
             if (write)
             {
@@ -109,18 +128,7 @@ namespace Rulealize.Cli
             }
 
             Console.Error.WriteLine($"'{named}' is not legal from {session.Source}.");
-
-            if (moves.Count is 0)
-            {
-                Console.Error.WriteLine("Nothing is.");
-                return null;
-            }
-
-            Console.Error.WriteLine("These are:");
-            foreach (ValidInput move in moves)
-            {
-                Console.Error.WriteLine($"  {move}");
-            }
+            Report(moves);
 
             // The distinction is worth drawing: a refusal that is the rule set working is not
             // the same as one that is a typo, and only a document can ask for the first.
@@ -128,6 +136,30 @@ namespace Rulealize.Cli
             Console.Error.WriteLine("To apply something the rule set refuses -- to check that it does -- write the");
             Console.Error.WriteLine("input document and pass --input <file>.");
             return null;
+        }
+
+        private static void Report(Session session, int limit)
+        {
+            if (Session.Guarded(() => session.Context.GetValidInputs(session.State, limit), out ValidInputSet? moves)
+                is 0)
+            {
+                Report(moves!);
+            }
+        }
+
+        private static void Report(ValidInputSet moves)
+        {
+            if (moves.Count is 0)
+            {
+                Console.Error.WriteLine("Nothing is legal here.");
+                return;
+            }
+
+            Console.Error.WriteLine("These are:");
+            foreach (ValidInput move in moves)
+            {
+                Console.Error.WriteLine($"  {move}");
+            }
         }
     }
 }

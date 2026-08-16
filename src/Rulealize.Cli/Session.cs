@@ -86,9 +86,18 @@ namespace Rulealize.Cli
         /// <param name="value">Receives the result.</param>
         /// <returns>Zero on success.</returns>
         /// <remarks>
+        /// <para>
         /// A state document is the one input here that nothing checked earlier. It arrives
         /// from a file the caller wrote, and the schema it has to satisfy belongs to the rule
         /// set, so the first thing that reads it is the first thing that can refuse it.
+        /// </para>
+        /// <para>
+        /// <see cref="IllegalInputException"/> is caught as well, and reported as flatly as
+        /// the rest, because a caller who wants to say more about a refusal has to catch it
+        /// before reaching here — which <c>apply</c> does. What this stops is the case where
+        /// nobody has: a rule set saying no is an answer, and answering with a stack trace
+        /// would make it look like a defect in the tool.
+        /// </para>
         /// </remarks>
         public static int Guarded<T>(Func<T> work, out T? value)
         {
@@ -99,7 +108,8 @@ namespace Rulealize.Cli
                 value = work();
                 return 0;
             }
-            catch (Exception failure) when (failure is RuleDocumentException or RuleEvaluationException)
+            catch (Exception failure)
+                when (failure is RuleDocumentException or RuleEvaluationException or IllegalInputException)
             {
                 Console.Error.WriteLine(failure.Message);
                 return 1;
