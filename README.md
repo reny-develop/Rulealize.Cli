@@ -1,10 +1,97 @@
 # Rulealize.Cli
 
-Materialises the plugin folder a [Rulealize](https://github.com/reny-develop/Rulealize) rule
-set's `requires` calls for.
+Works with [Rulealize](https://github.com/reny-develop/Rulealize) rule sets and the
+vocabularies they draw on, from a command line.
 
 ```sh
 dotnet tool install -g Rulealize.Cli
+```
+
+| | |
+| --- | --- |
+| `rulealize restore <rule set>` | fetch what the document's `requires` names, into a folder |
+| `rulealize plugins` | what a folder of vocabularies provides, or why it provides nothing |
+| `rulealize check <rule set>` | does this document compile against that folder |
+
+All three take `--plugins <folder>`, and it defaults to `plugin`.
+
+Requires `net10.0` and the .NET SDK, which a `dotnet tool` implies.
+
+## The folder is the seam
+
+Every command works against a folder of assemblies, because that is the arrangement a
+deployed application has: they are swept, instantiated and registered, and nothing else
+about a vocabulary is consulted. Two things follow, and both are the point.
+
+**A vocabulary nobody publishes joins in by being copied there.** `restore` fills the folder
+from nuget.org; a plugin still being written fills it with `dotnet build` and a copy. From
+that moment the two are indistinguishable, which is what makes the folder worth being the
+seam.
+
+**What goes wrong here goes wrong in production too.** A class left internal will not load
+either place. The difference is that here something is willing to say so.
+
+## `rulealize plugins`
+
+```
+plugin
+  13 assemblies, 13 vocabularies
+
+  My.Vocabulary 1.0.0  (my)
+      my.length                    expression
+
+  Rulealize.Plugin.Binding 1.0.0  (bind)  @
+      bind.let                     expression
+      bind.local                   expression
+  …
+69 operations in total.
+```
+
+The operations are read back off the loaded runtime — `RuleRuntime.Operations` — and not
+off anybody's source. Nothing declares what a vocabulary provides: the operations exist only
+as the calls it made while registering, so this list is the sole account of them, and it is
+the one a rule set will be compiled against. **An operation that was written but never
+registered is missing from it**, which is the cheapest way there is to find a forgotten
+`AddExpression`.
+
+When a folder holds assemblies and yields no vocabulary, the runtime does not say why — a
+sweep is speculative, since pointing one at an application's own output must not be an
+error, so a type it cannot use is passed over in silence. That is right for the runtime and
+useless here, where somebody asked on purpose. So this asks again, itself:
+
+```
+notpublic
+  1 assembly, 0 vocabularies
+
+Nothing loaded, and the runtime does not say why: a folder sweep passes
+over what it cannot use. What is in there:
+
+  MyVocabulary.Vocabulary
+      is not public. A sweep only takes public types.
+```
+
+The conditions are public, not nested, not abstract, and a parameterless constructor.
+
+## `rulealize check`
+
+The same compile `restore` ends with, on its own and without the network.
+
+```
+'probe.json' compiles against 'plugin' (13 vocabularies, 69 operations).
+```
+
+```
+'typo.json' does not compile against 'plugin':
+  /inputs/measure/effects[0]/value: 'my.lenght' is not an operation any loaded plugin
+  provides. Check the rule set's 'requires'.
+```
+
+Restoring is something a document needs once. This is the question asked after every edit,
+and a loop that reached nuget.org to answer it is a loop nobody would run.
+
+## `rulealize restore`
+
+```sh
 rulealize restore reversi.json
 ```
 
@@ -15,8 +102,6 @@ rulealize restore reversi.json
 10 plugins -> plugin
 'reversi.json' compiles against it.
 ```
-
-Requires `net10.0` and the .NET SDK, which a `dotnet tool` implies.
 
 ## Why
 

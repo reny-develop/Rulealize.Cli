@@ -17,9 +17,9 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>rulealize</ToolCommandName>
     <PackageId>Rulealize.Cli</PackageId>
-    <Version>0.1.0</Version>
+    <Version>0.2.0</Version>
     <Authors>Reny</Authors>
-    <Description>Materialises the plugin folder a Rulealize rule set's `requires` calls for.</Description>
+    <Description>Works with Rulealize rule sets and the vocabularies they draw on, from a command line: restore what `requires` names, report what a plugin folder provides, and check that a document compiles against it.</Description>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <RepositoryUrl>https://github.com/reny-develop/Rulealize.Cli</RepositoryUrl>
