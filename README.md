@@ -138,10 +138,24 @@ there, which is the arrangement a deployed application actually has.
 ## What it will not do
 
 **Fetch a vocabulary nobody publishes.** A rule set may name one, and
-[it is a supported arrangement](https://github.com/reny-develop/Rulealize/blob/main/doc/plugin.md#a-vocabulary-that-is-not-distributed):
-implement `IRulealizePlugin` in your own assembly and hand an instance to `AddPlugin`. Such a
-document is refused with the missing vocabulary named, and with a count of what would have
-resolved, because that half is the useful part of the answer.
+[it is a supported arrangement](https://github.com/reny-develop/Rulealize/blob/main/doc/plugin.md#a-vocabulary-that-is-not-distributed).
+There is nothing on the feed to fetch, so **put the assembly in the folder yourself** and
+restoring credits it and fetches the rest:
+
+```
+  My.Vocabulary (already in plugin)
+  Rulealize.Plugin.State 1.0.0
+  Rulealize.Plugin.TypeSchema 1.1.0
+2 plugins -> plugin, 1 already there
+'probe.json' compiles against it.
+```
+
+Whether the version there answers the constraint is Rulealize's reading — the same
+`PluginRequirement.IsSatisfiedBy` the runtime checks a loaded plugin against — for the
+reason no version choice is made here either.
+
+A requirement neither the feed nor the folder can meet is still a refusal, naming what is
+missing and how many would have resolved.
 
 **Rewrite your document.** Restoring means fetching what it asks for. Asking for something
 else is an edit, and an edit is yours.

@@ -39,6 +39,64 @@ namespace Rulealize.Cli
             }
         }
 
+        /// <summary>What the folder already provides, by plugin identifier.</summary>
+        /// <param name="folder">The folder.</param>
+        /// <returns>The version of each vocabulary found, or an empty map.</returns>
+        /// <remarks>
+        /// <para>
+        /// Read from a copy, because <c>Assembly.LoadFrom</c> holds a file open for the life
+        /// of the process and this is a folder the caller is about to write into. The copy is
+        /// then the thing that cannot be deleted, which is a temporary directory's problem
+        /// rather than the user's.
+        /// </para>
+        /// <para>
+        /// A manifest is an instance property, so there is no reading one without
+        /// instantiating the plugin. That is why this cannot be done from metadata alone.
+        /// </para>
+        /// </remarks>
+        public static IReadOnlyDictionary<string, Version> Present(string folder)
+        {
+            Dictionary<string, Version> found = new(StringComparer.OrdinalIgnoreCase);
+
+            if (!Directory.Exists(folder))
+            {
+                return found;
+            }
+
+            string scratch = Directory.CreateTempSubdirectory("rulealize-present").FullName;
+
+            try
+            {
+                foreach (string file in Directory.EnumerateFiles(folder, "*.dll"))
+                {
+                    File.Copy(file, Path.Combine(scratch, Path.GetFileName(file)), overwrite: true);
+                }
+
+                foreach (PluginManifest manifest in new RuleRuntime().LoadPluginsFrom(scratch).Plugins)
+                {
+                    found[manifest.Id] = manifest.Version;
+                }
+            }
+            catch (Exception exception) when (exception is PluginLoadException or IOException)
+            {
+                // A folder that cannot be read provides nothing, which is the answer this
+                // returns anyway. Saying so is the caller's business, not this method's.
+            }
+            finally
+            {
+                try
+                {
+                    Directory.Delete(scratch, recursive: true);
+                }
+                catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+                {
+                    // Loaded assemblies are open. Left for the operating system.
+                }
+            }
+
+            return found;
+        }
+
         /// <summary>Counts the assemblies a sweep of this folder would look at.</summary>
         /// <param name="folder">The folder.</param>
         /// <returns>The file names.</returns>

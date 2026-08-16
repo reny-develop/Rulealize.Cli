@@ -72,12 +72,34 @@ namespace Rulealize.Cli
 
             PluginResolution resolution = PluginResolution.Resolve(required, published);
 
+            // What the feed could not answer for, the folder may already hold. A vocabulary
+            // nobody publishes is a supported arrangement, and one still being written is the
+            // ordinary case of it — both arrive the same way, by being copied in, and neither
+            // is a reason to refuse the plugins that did resolve.
+            List<UnsatisfiedRequirement> credited = [];
+            List<UnsatisfiedRequirement> missing = [];
+
             if (!resolution.IsComplete)
             {
-                Console.Error.WriteLine($"'{ruleSetPath}' cannot be restored from nuget.org:");
-                foreach (UnsatisfiedRequirement missing in resolution.Unsatisfied)
+                IReadOnlyDictionary<string, Version> present = PluginFolder.Present(outputFolder);
+
+                foreach (UnsatisfiedRequirement unsatisfied in resolution.Unsatisfied)
                 {
-                    Console.Error.WriteLine($"  {missing}");
+                    // Whether a version answers a constraint is Rulealize's reading, not this
+                    // tool's, for the reason no version choice is made here either.
+                    bool satisfied = present.TryGetValue(unsatisfied.Plugin, out Version? version)
+                        && unsatisfied.Requirements.All(requirement => requirement.IsSatisfiedBy(version));
+
+                    (satisfied ? credited : missing).Add(unsatisfied);
+                }
+            }
+
+            if (missing.Count is not 0)
+            {
+                Console.Error.WriteLine($"'{ruleSetPath}' cannot be restored from nuget.org:");
+                foreach (UnsatisfiedRequirement unsatisfied in missing)
+                {
+                    Console.Error.WriteLine($"  {unsatisfied}");
                 }
 
                 // Worth saying rather than leaving to be inferred. A vocabulary implemented in
@@ -86,9 +108,9 @@ namespace Rulealize.Cli
                 // for this command to fetch.
                 Console.Error.WriteLine();
                 Console.Error.WriteLine(
-                    "A plugin nothing publishes is not necessarily a mistake: a vocabulary can be implemented");
+                    "A plugin nothing publishes is not necessarily a mistake. Build it and copy its");
                 Console.Error.WriteLine(
-                    "in your own assembly and passed to RuleRuntime.AddPlugin. Nothing here can fetch one.");
+                    $"assembly into '{outputFolder}', and this will credit it and fetch the rest.");
 
                 if (!resolution.Plugins.IsEmpty)
                 {
@@ -101,6 +123,11 @@ namespace Rulealize.Cli
 
             await Fetch(resolution, outputFolder);
 
+            foreach (UnsatisfiedRequirement local in credited)
+            {
+                Console.WriteLine($"  {local.Plugin} (already in {outputFolder})");
+            }
+
             foreach (ResolvedPlugin plugin in resolution.Plugins)
             {
                 Console.WriteLine($"  {plugin}");
@@ -108,7 +135,9 @@ namespace Rulealize.Cli
 
             // ASCII, deliberately. A console writes in the machine's codepage, and this line
             // is the one most likely to be redirected into a log read somewhere else.
-            Console.WriteLine($"{resolution.Plugins.Length} plugins -> {outputFolder}");
+            Console.WriteLine(credited.Count is 0
+                ? $"{resolution.Plugins.Length} plugins -> {outputFolder}"
+                : $"{resolution.Plugins.Length} plugins -> {outputFolder}, {credited.Count} already there");
 
             // The folder is only right if it runs the document, and the way to find out is the
             // way the application will do it. This costs one compile and turns "the packages
