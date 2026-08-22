@@ -38,7 +38,7 @@
     assembling a folder the runtime then refuses.
   -->
   <ItemGroup>
-    <PackageReference Include="Rulealize" Version="0.4.0" />
+    <PackageReference Include="Rulealize" Version="0.4.1" />
   </ItemGroup>
 
 </Project>
