@@ -23,6 +23,7 @@ using Rulealize.Cli;
 // nobody else's: standard output by default, a file with --write, and memory in `play`.
 
 const int DefaultLimit = 10000;
+const int DefaultOutcomeLimit = 64;
 
 if (args.Length is 0)
 {
@@ -32,21 +33,21 @@ if (args.Length is 0)
 string folder = Option("--plugins") ?? Option("--out") ?? PluginFolder.Default;
 string? statePath = Option("--state");
 string? inputPath = Option("--input");
+string? outcomePath = Option("--outcome");
 bool json = args.Contains("--json");
 bool write = args.Contains("--write");
 
 int limit = DefaultLimit;
-if (Option("--limit") is string text)
-{
-    // GetValidInputs refuses a limit of zero or less, and refusing it here says so where
-    // the number was written rather than where it was used.
-    if (!int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsed) || parsed <= 0)
-    {
-        Console.Error.WriteLine($"--limit takes a positive whole number, not '{text}'.");
-        return 2;
-    }
+int outcomeLimit = DefaultOutcomeLimit;
 
-    limit = parsed;
+// Both refuse zero or less, and refusing them here says so where the number was written
+// rather than where it was used. They are two quantities despite the similar names:
+// --limit bounds how many guards GetValidInputs evaluates, and --outcomes bounds how many
+// outcomes come back, which is why truncating the first still leaves legal moves and
+// truncating the second leaves a distribution that no longer sums to one.
+if (!Positive("--limit", ref limit) || !Positive("--outcomes", ref outcomeLimit))
+{
+    return 2;
 }
 
 return args switch
@@ -56,11 +57,29 @@ return args switch
     ["check", string ruleSet, ..] => CheckCommand.Run(ruleSet, folder),
     ["moves", string ruleSet, ..] => MovesCommand.Run(ruleSet, folder, statePath, limit, json),
     ["apply", string ruleSet, string named, ..] when !named.StartsWith("--", StringComparison.Ordinal) =>
-        ApplyCommand.Run(ruleSet, named, inputPath, folder, statePath, limit, write),
-    ["apply", string ruleSet, ..] => ApplyCommand.Run(ruleSet, null, inputPath, folder, statePath, limit, write),
-    ["play", string ruleSet, ..] => PlayCommand.Run(ruleSet, folder, statePath, limit),
+        ApplyCommand.Run(ruleSet, named, inputPath, outcomePath, folder, statePath, limit, outcomeLimit, write),
+    ["apply", string ruleSet, ..] =>
+        ApplyCommand.Run(ruleSet, null, inputPath, outcomePath, folder, statePath, limit, outcomeLimit, write),
+    ["play", string ruleSet, ..] => PlayCommand.Run(ruleSet, folder, statePath, limit, outcomeLimit),
     _ => Usage()
 };
+
+bool Positive(string name, ref int value)
+{
+    if (Option(name) is not string text)
+    {
+        return true;
+    }
+
+    if (!int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsed) || parsed <= 0)
+    {
+        Console.Error.WriteLine($"{name} takes a positive whole number, not '{text}'.");
+        return false;
+    }
+
+    value = parsed;
+    return true;
+}
 
 string? Option(string name)
 {
@@ -81,6 +100,8 @@ static int Usage()
     Console.Error.WriteLine("  --plugins <folder>   where the vocabularies are        (default 'plugin')");
     Console.Error.WriteLine("  --state <file>       the position to start from        (default the rule set's)");
     Console.Error.WriteLine("  --limit <n>          candidates GetValidInputs may try (default 10000)");
+    Console.Error.WriteLine("  --outcomes <n>       outcomes GetOutcomes may return   (default 64)");
+    Console.Error.WriteLine("  --outcome <file>     what was drawn, for an input that resolves something nobody chose");
     Console.Error.WriteLine("  --write              amend --state in place instead of writing to standard output");
     Console.Error.WriteLine("  --json               moves, as the runtime writes them");
     return 2;

@@ -20,6 +20,8 @@ dotnet tool install -g Rulealize.Cli
 --plugins <folder>   where the vocabularies are        (default 'plugin')
 --state <file>       the position to start from        (default the rule set's own)
 --limit <n>          candidates GetValidInputs may try (default 10000)
+--outcomes <n>       outcomes GetOutcomes may return   (default 64)
+--outcome <file>     what was drawn, for an input that resolves something nobody chose
 --write              amend --state in place instead of writing to standard output
 --json               moves, as the runtime writes them
 ```
@@ -89,6 +91,63 @@ These are:
 
 Which leaves the one thing this cannot express — an input the rule set ought to refuse, and
 checking that it does — to `--input <file>` and a written document.
+
+## When nobody chooses the next state
+
+Not every rule set settles where it lands from the input alone. A card comes off a deck and
+the input has more than one state it could arrive at, so `apply` will not pick one — doing
+that would be this tool inventing an answer nobody enumerated, and it is the one thing the
+runtime is built not to do. It says what could have happened instead:
+
+```
+$ rulealize apply blackjack.json "dealSeat"
+'dealSeat' resolves something nobody chose, so applying it takes an outcome as well.
+
+What could happen, most likely first:
+  A (0.077)
+  2 (0.077)
+  …
+
+Write the one that happened as a rulealize/outcome/v1 document and pass it
+with --outcome <file>. 'play' asks rather than stopping.
+```
+
+```jsonc
+// what.json
+{ "$schema": "rulealize/outcome/v1", "ruleSet": "blackjack@1.0.0",
+  "input": "dealSeat", "draws": ["9"] }
+```
+
+```sh
+rulealize apply blackjack.json "dealSeat" --outcome what.json > s1.json
+```
+
+An input and an outcome settle a transition exactly, so that pair reproduces `s1.json`
+however long afterwards — which is what makes a redirected sequence of them a record rather
+than a re-run.
+
+`play` asks, because it has somebody there to ask:
+
+```
+    1. dealSeat
+>1
+
+  Nobody chooses what happens next. Which did?
+    1. A (0.077)
+    2. 2 (0.077)
+    …
+>9
+```
+
+**Nothing here rolls anything.** The alternatives come from `GetOutcomes`, and choosing one
+is the caller's — a file in `apply`, a person in `play`, a random number generator in a host
+that wants one. That is the same arrangement either way, which is why neither command has a
+`--seed`.
+
+**A rule set with no chance in it notices none of this.** An input that draws nothing has
+exactly one outcome, of probability one, so `apply` needs no `--outcome` and `play` never
+asks. Both commands call `GetOutcomes` regardless; there is no branch here for chance,
+because there is none in the runtime either.
 
 ## `moves`
 

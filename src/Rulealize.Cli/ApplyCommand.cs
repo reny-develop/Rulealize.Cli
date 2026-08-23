@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Reny
 // Licensed under the Apache License, Version 2.0.
 
+using System.Globalization;
 using Rulealize;
 using Rulealize.Abstraction;
 
@@ -29,9 +30,11 @@ namespace Rulealize.Cli
             string ruleSetPath,
             string? named,
             string? inputPath,
+            string? outcomePath,
             string folder,
             string? statePath,
             int limit,
+            int outcomeLimit,
             bool write)
         {
             if (named is null && inputPath is null)
@@ -72,6 +75,19 @@ namespace Rulealize.Cli
                 return 1;
             }
 
+            string? outcomeDocument = null;
+
+            if (outcomePath is not null)
+            {
+                if (!File.Exists(outcomePath))
+                {
+                    Console.Error.WriteLine($"'{outcomePath}' does not exist.");
+                    return 1;
+                }
+
+                outcomeDocument = File.ReadAllText(outcomePath);
+            }
+
             // Applied here rather than through Session.Guarded, which reports every failure
             // the same way. A refusal is not a failure of the same kind, and this is the one
             // command with something better to say about it.
@@ -79,7 +95,9 @@ namespace Rulealize.Cli
 
             try
             {
-                result = session.Context.ApplyToState(inputDocument, session.State);
+                result = outcomeDocument is null
+                    ? session.Context.ApplyToState(inputDocument, session.State)
+                    : session.Context.ApplyToState(inputDocument, session.State, outcomeDocument);
             }
             catch (IllegalInputException refused)
             {
@@ -90,6 +108,12 @@ namespace Rulealize.Cli
                 Console.Error.WriteLine($"refused from {session.Source}: {refused.Message}");
                 Report(session, limit);
                 return 1;
+            }
+            catch (InvalidOperationException)
+            {
+                // The rule set says the next state is not the mover's alone to settle, and
+                // this is the overload that cannot say which of them happened.
+                return Enumerate(session, inputDocument, named ?? inputPath!, outcomeLimit);
             }
             catch (Exception failure) when (failure is RuleDocumentException or RuleEvaluationException)
             {
@@ -160,6 +184,47 @@ namespace Rulealize.Cli
             {
                 Console.Error.WriteLine($"  {move}");
             }
+        }
+
+        /// <summary>Says what could happen, for an input this command cannot settle alone.</summary>
+        /// <remarks>
+        /// Neither a fault nor a bad document. The rule set says the next state is not
+        /// whoever moves' to decide, and picking one of the alternatives would be this
+        /// command inventing an answer nobody enumerated — which is the one thing the runtime
+        /// is built not to do. So it prints what could have happened, says how to name the
+        /// one that did, and stops.
+        /// </remarks>
+        private static int Enumerate(Session session, string inputDocument, string named, int outcomeLimit)
+        {
+            Console.Error.WriteLine(
+                $"'{named}' resolves something nobody chose, so applying it takes an outcome as well.");
+
+            if (Session.Guarded(
+                    () => session.Context.GetOutcomes(inputDocument, session.State, outcomeLimit),
+                    out OutcomeSet? outcomes)
+                is not 0)
+            {
+                return 1;
+            }
+
+            Console.Error.WriteLine();
+            Console.Error.WriteLine("What could happen, most likely first:");
+            foreach (Outcome outcome in outcomes!)
+            {
+                Console.Error.WriteLine($"  {outcome}");
+            }
+
+            if (outcomes.Truncated)
+            {
+                Console.Error.WriteLine(
+                    $"  -- these cover {outcomes.Coverage.ToString("0.###", CultureInfo.InvariantCulture)}"
+                    + " of the probability; pass --outcomes to raise the limit");
+            }
+
+            Console.Error.WriteLine();
+            Console.Error.WriteLine("Write the one that happened as a rulealize/outcome/v1 document and pass it");
+            Console.Error.WriteLine("with --outcome <file>. 'play' asks rather than stopping.");
+            return 2;
         }
     }
 }

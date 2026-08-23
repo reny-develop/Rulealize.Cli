@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Reny
 // Licensed under the Apache License, Version 2.0.
 
+using System.Globalization;
 using Rulealize;
 
 namespace Rulealize.Cli
@@ -23,7 +24,7 @@ namespace Rulealize.Cli
     /// </remarks>
     internal static class PlayCommand
     {
-        public static int Run(string ruleSetPath, string folder, string? statePath, int limit)
+        public static int Run(string ruleSetPath, string folder, string? statePath, int limit, int outcomeLimit)
         {
             if (Session.Open(ruleSetPath, folder, statePath) is not Session session)
             {
@@ -98,12 +99,56 @@ namespace Rulealize.Cli
                 string input = moves[choice - 1].ToInputDocument(context.RuleSet);
                 string before = state;
 
-                if (Session.Guarded(() => context.ApplyToState(input, before), out TransitionResult? result) is not 0)
+                // GetValidInputs said who may do what; this says what may then happen. An
+                // input that draws nothing has exactly one outcome, of probability one, so
+                // the shape of this loop is the same whether the rule set has chance in it
+                // or not -- only whether there is anything to ask about differs.
+                if (Session.Guarded(
+                        () => context.GetOutcomes(input, before, outcomeLimit),
+                        out OutcomeSet? outcomes)
+                    is not 0)
                 {
                     return 1;
                 }
 
-                state = result!.State;
+                if (outcomes!.Count is 1)
+                {
+                    state = outcomes[0].Result.State;
+                    continue;
+                }
+
+                // Nothing here rolls anything. The alternatives were enumerated by the
+                // runtime and one of them is chosen by whoever is playing, which is the same
+                // arrangement a host with a random number generator in it has.
+                Console.WriteLine();
+                Console.WriteLine("  Nobody chooses what happens next. Which did?");
+                for (int i = 0; i < outcomes.Count; i++)
+                {
+                    Console.WriteLine($"  {i + 1,3}. {outcomes[i]}");
+                }
+
+                if (outcomes.Truncated)
+                {
+                    Console.WriteLine(
+                        $"       these cover {outcomes.Coverage.ToString("0.###", CultureInfo.InvariantCulture)}"
+                        + " of the probability -- pass --outcomes to raise it");
+                }
+
+                Console.Write("> ");
+                string? which = Console.ReadLine();
+
+                if (which is null or "q" or "quit")
+                {
+                    return 0;
+                }
+
+                if (!int.TryParse(which, out int branch) || branch < 1 || branch > outcomes.Count)
+                {
+                    Console.WriteLine($"Choose 1 to {outcomes.Count}.");
+                    continue;
+                }
+
+                state = outcomes[branch - 1].Result.State;
             }
         }
     }
