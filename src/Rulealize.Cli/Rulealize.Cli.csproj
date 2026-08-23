@@ -31,11 +31,14 @@
   </ItemGroup>
 
   <!--
-    Rulealize is here for two things and neither is evaluation: PluginRequirement reads a
-    document's requires, and PluginResolution decides which versions it calls for. Both are
-    pure, and the reason they are not reimplemented here is that a second reading of ^1.0
-    would eventually differ from the runtime's, and the way it would show is this tool
-    assembling a folder the runtime then refuses.
+    The runtime, and every command here is a caller of it: restore and check compile a
+    document, moves asks what is legal, apply and play transition a state and ask what could
+    happen to it.
+
+    PluginRequirement and PluginResolution come from the same package on purpose. Both are
+    pure and both could have been written here, and the reason they were not is that a
+    second reading of ^1.0 would eventually differ from the runtime's, and the way it would
+    show is this tool assembling a folder the runtime then refuses.
   -->
   <ItemGroup>
     <PackageReference Include="Rulealize" Version="0.4.1" />
