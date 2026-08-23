@@ -17,7 +17,7 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>rulealize</ToolCommandName>
     <PackageId>Rulealize.Cli</PackageId>
-    <Version>0.4.0</Version>
+    <Version>0.5.0</Version>
     <Authors>Reny</Authors>
     <Description>Runs a Rulealize rule set from a command line: restore the plugins it requires, report what a plugin folder provides, and check, list the legal inputs, apply one, or walk it interactively.</Description>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
@@ -41,7 +41,7 @@
     show is this tool assembling a folder the runtime then refuses.
   -->
   <ItemGroup>
-    <PackageReference Include="Rulealize" Version="0.4.1" />
+    <PackageReference Include="Rulealize" Version="0.5.0" />
   </ItemGroup>
 
 </Project>
