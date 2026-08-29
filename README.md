@@ -9,7 +9,7 @@ dotnet tool install -g Rulealize.Cli
 
 | | |
 | --- | --- |
-| `rulealize restore <rule set>` | fetch what the document's `requires` names, into a folder |
+| `rulealize restore <rule set>` | fetch what `requires` names, in the document and in what it holds, into a folder |
 | `rulealize plugins` | what a folder of vocabularies provides, or why it provides nothing |
 | `rulealize check <rule set>` | does this document compile against that folder |
 | `rulealize moves <rule set>` | what is legal from a position |
@@ -18,6 +18,7 @@ dotnet tool install -g Rulealize.Cli
 
 ```
 --plugins <folder>   where the vocabularies are        (default 'plugin')
+--rulesets <folder>  where the documents it holds are  (default the rule set's own folder)
 --state <file>       the position to start from        (default the rule set's own)
 --limit <n>          candidates GetValidInputs may try (default 10000)
 --outcomes <n>       outcomes GetOutcomes may return   (default 64)
@@ -185,6 +186,58 @@ seam.
 
 **What goes wrong here goes wrong in production too.** A class left internal will not load
 either place. The difference is that here something is willing to say so.
+
+## A rule set that holds other rule sets
+
+`uses` names the rule sets a document holds, by identifier, and the runtime is handed their
+documents. Nothing publishes a rule set document — they are files an author keeps beside one
+another — so **the folder the document is in is where those are looked for**, and
+`--rulesets <folder>` says where they are when they are kept somewhere else.
+
+```
+$ rulealize check process.json
+'process.json' compiles against 'plugin' (5 vocabularies, 33 operations).
+holding 1 rule set:
+  counter@1.0.0 ('counter.json')
+```
+
+Which document answers to an identifier is read out of the document and not off its file
+name. `id` is what the document declares and what `uses` names; a file's name is nobody's
+business but the author's. Files in the folder that are not rule sets — the states and the
+outcomes written beside them — carry no `id` and are passed over, the way a plugin sweep
+passes over an assembly it cannot use.
+
+**An identifier has one document in a folder.** Two of them declaring it is a refusal naming
+both, because taking whichever the file system listed first would settle something no
+document said, and settle it quietly.
+
+**No version is chosen here and no constraint is read.** With one document per identifier
+there is nothing to choose between, and whether the one that is there satisfies what its
+holder asked for is Rulealize's reading — for the reason no version choice is made in
+`restore` either:
+
+```
+'process.json' does not compile against 'plugin':
+  /uses[0]/version: this rule set needs counter ^1.0 as c, but 2.0.0 was supplied.
+```
+
+**`restore` fetches what the whole graph requires.** `requires` is the whole of what one
+document may draw on, so a folder assembled from the holder's alone is one its components do
+not compile against:
+
+```
+$ rulealize restore process.json
+holding 1 rule set:
+  counter@1.0.0 ('counter.json')
+  Rulealize.Plugin.Arithmetic 1.0.0
+  ...
+5 plugins -> plugin
+'process.json' compiles against it.
+```
+
+Nothing else here changes. A held rule set's inputs are offered as `alias.input`, so `moves`
+prints them, `apply` takes them and `play` walks them like anything else; a composite's case
+is still one state document; and a document that holds nothing reads no folder at all.
 
 ## `rulealize plugins`
 

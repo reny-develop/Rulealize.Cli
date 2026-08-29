@@ -21,6 +21,13 @@ namespace Rulealize.Cli
     /// too late to be useful.
     /// </para>
     /// <para>
+    /// What a document requires is read from every document in the graph, because a
+    /// composite is compiled with its components and <c>requires</c> is the whole of what
+    /// each of them may draw on. A folder assembled from the holder's list alone would be one
+    /// its components do not compile against — and the compile at the end of this would be
+    /// where that showed, which is the point of it.
+    /// </para>
+    /// <para>
     /// This talks to nuget.org and not to the registry. What restoring needs is which
     /// versions of a named plugin are published and the packages themselves, and the feed
     /// answers both; the registry's catalogue is for finding a plugin you could not already
@@ -31,7 +38,7 @@ namespace Rulealize.Cli
     {
         private const string FlatContainer = "https://api.nuget.org/v3-flatcontainer";
 
-        public static async Task<int> Run(string ruleSetPath, string outputFolder)
+        public static async Task<int> Run(string ruleSetPath, string outputFolder, string? ruleSets)
         {
             if (!File.Exists(ruleSetPath))
             {
@@ -41,10 +48,23 @@ namespace Rulealize.Cli
 
             string document = await File.ReadAllTextAsync(ruleSetPath);
 
-            IReadOnlyList<PluginRequirement> required;
+            // What a composite draws on includes what its components draw on. `requires` is
+            // the whole of what one document may use and no more, so a folder assembled from
+            // the holder's alone would be one the components do not compile against.
+            if (RuleSetFolder.Gather(ruleSetPath, document, ruleSets) is not RuleSetFolder held)
+            {
+                return 1;
+            }
+
+            held.Report();
+
+            List<PluginRequirement> required = [];
             try
             {
-                required = PluginRequirement.ReadFrom(document);
+                foreach (string each in new[] { document }.Concat(held.Documents.Values))
+                {
+                    required.AddRange(PluginRequirement.ReadFrom(each));
+                }
             }
             catch (RuleSetBuildException failure)
             {
@@ -144,7 +164,7 @@ namespace Rulealize.Cli
             // downloaded" into "this rule set loads against what is now on disk".
             try
             {
-                new RuleRuntime().LoadPluginsFrom(outputFolder).CreateContext(document);
+                new RuleRuntime().LoadPluginsFrom(outputFolder).CreateContext(document, held.Documents);
             }
             catch (Exception failure) when (failure is RuleSetBuildException or PluginLoadException)
             {

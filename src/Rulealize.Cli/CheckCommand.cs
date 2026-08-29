@@ -23,7 +23,7 @@ namespace Rulealize.Cli
     /// </remarks>
     internal static class CheckCommand
     {
-        public static int Run(string ruleSetPath, string folder)
+        public static int Run(string ruleSetPath, string folder, string? ruleSets)
         {
             if (!File.Exists(ruleSetPath))
             {
@@ -38,9 +38,16 @@ namespace Rulealize.Cli
 
             string document = File.ReadAllText(ruleSetPath);
 
+            // A composite is compiled with the documents it holds, and so is everything they
+            // hold in turn, so this answers for the whole graph rather than for one file.
+            if (RuleSetFolder.Gather(ruleSetPath, document, ruleSets) is not RuleSetFolder held)
+            {
+                return 1;
+            }
+
             try
             {
-                runtime.CreateContext(document);
+                runtime.CreateContext(document, held.Documents);
             }
             catch (RuleSetBuildException failure)
             {
@@ -62,6 +69,8 @@ namespace Rulealize.Cli
             Console.WriteLine($"'{ruleSetPath}' compiles against '{folder}' "
                 + $"({PluginFolder.Count(runtime.Plugins.Length, "vocabulary", "vocabularies")}, "
                 + $"{PluginFolder.Count(runtime.Operations.Length, "operation", "operations")}).");
+
+            held.Report();
 
             return 0;
         }

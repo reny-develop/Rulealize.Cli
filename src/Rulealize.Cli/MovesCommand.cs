@@ -22,9 +22,15 @@ namespace Rulealize.Cli
     /// </remarks>
     internal static class MovesCommand
     {
-        public static int Run(string ruleSetPath, string folder, string? statePath, int limit, bool json)
+        public static int Run(
+            string ruleSetPath,
+            string folder,
+            string? ruleSets,
+            string? statePath,
+            int limit,
+            bool json)
         {
-            if (Session.Open(ruleSetPath, folder, statePath) is not Session session)
+            if (Session.Open(ruleSetPath, folder, ruleSets, statePath) is not Session session)
             {
                 return 1;
             }

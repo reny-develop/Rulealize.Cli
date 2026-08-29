@@ -32,6 +32,7 @@ namespace Rulealize.Cli
             string? inputPath,
             string? outcomePath,
             string folder,
+            string? ruleSets,
             string? statePath,
             int limit,
             int outcomeLimit,
@@ -49,7 +50,7 @@ namespace Rulealize.Cli
                 return 2;
             }
 
-            if (Session.Open(ruleSetPath, folder, statePath) is not Session session)
+            if (Session.Open(ruleSetPath, folder, ruleSets, statePath) is not Session session)
             {
                 return 1;
             }

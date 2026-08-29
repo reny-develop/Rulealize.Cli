@@ -18,6 +18,10 @@ using Rulealize.Cli;
 // assemblies on disk, swept and instantiated. A vocabulary nobody publishes joins in by
 // being copied there, which is how a plugin still being written is tried.
 //
+// A rule set may hold other rule sets, and nothing publishes a document either: they are
+// files beside the one that holds them, or wherever --rulesets says. So every command here
+// works on the graph a document names rather than on the one file it was given.
+//
 // The runtime holds no state. ApplyToState is a function of the state it was handed, so
 // where a position comes from and where the next one goes are this tool's decisions and
 // nobody else's: standard output by default, a file with --write, and memory in `play`.
@@ -31,6 +35,12 @@ if (args.Length is 0)
 }
 
 string folder = Option("--plugins") ?? Option("--out") ?? PluginFolder.Default;
+
+// Where the documents a rule set holds are looked for. Null rather than a default folder
+// name: a rule set that holds another is written beside it, so the folder the document is
+// in is the answer until somebody says otherwise, and a document that holds nothing never
+// reads a folder at all.
+string? ruleSets = Option("--rulesets");
 string? statePath = Option("--state");
 string? inputPath = Option("--input");
 string? outcomePath = Option("--outcome");
@@ -52,15 +62,17 @@ if (!Positive("--limit", ref limit) || !Positive("--outcomes", ref outcomeLimit)
 
 return args switch
 {
-    ["restore", string ruleSet, ..] => await RestoreCommand.Run(ruleSet, folder),
+    ["restore", string ruleSet, ..] => await RestoreCommand.Run(ruleSet, folder, ruleSets),
     ["plugins", ..] => PluginsCommand.Run(folder),
-    ["check", string ruleSet, ..] => CheckCommand.Run(ruleSet, folder),
-    ["moves", string ruleSet, ..] => MovesCommand.Run(ruleSet, folder, statePath, limit, json),
+    ["check", string ruleSet, ..] => CheckCommand.Run(ruleSet, folder, ruleSets),
+    ["moves", string ruleSet, ..] => MovesCommand.Run(ruleSet, folder, ruleSets, statePath, limit, json),
     ["apply", string ruleSet, string named, ..] when !named.StartsWith("--", StringComparison.Ordinal) =>
-        ApplyCommand.Run(ruleSet, named, inputPath, outcomePath, folder, statePath, limit, outcomeLimit, write),
+        ApplyCommand.Run(
+            ruleSet, named, inputPath, outcomePath, folder, ruleSets, statePath, limit, outcomeLimit, write),
     ["apply", string ruleSet, ..] =>
-        ApplyCommand.Run(ruleSet, null, inputPath, outcomePath, folder, statePath, limit, outcomeLimit, write),
-    ["play", string ruleSet, ..] => PlayCommand.Run(ruleSet, folder, statePath, limit, outcomeLimit),
+        ApplyCommand.Run(
+            ruleSet, null, inputPath, outcomePath, folder, ruleSets, statePath, limit, outcomeLimit, write),
+    ["play", string ruleSet, ..] => PlayCommand.Run(ruleSet, folder, ruleSets, statePath, limit, outcomeLimit),
     _ => Usage()
 };
 
@@ -98,6 +110,7 @@ static int Usage()
     Console.Error.WriteLine("  rulealize play    <rule set>");
     Console.Error.WriteLine();
     Console.Error.WriteLine("  --plugins <folder>   where the vocabularies are        (default 'plugin')");
+    Console.Error.WriteLine("  --rulesets <folder>  where the documents it holds are  (default the rule set's own)");
     Console.Error.WriteLine("  --state <file>       the position to start from        (default the rule set's)");
     Console.Error.WriteLine("  --limit <n>          candidates GetValidInputs may try (default 10000)");
     Console.Error.WriteLine("  --outcomes <n>       outcomes GetOutcomes may return   (default 64)");

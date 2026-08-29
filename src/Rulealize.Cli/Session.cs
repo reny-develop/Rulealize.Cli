@@ -37,9 +37,16 @@ namespace Rulealize.Cli
         /// <summary>Opens a rule set against a plugin folder, at a position.</summary>
         /// <param name="ruleSetPath">The rule set document.</param>
         /// <param name="folder">The plugin folder.</param>
+        /// <param name="ruleSets">Where the documents it holds are, or null for its own folder.</param>
         /// <param name="statePath">A state document, or null for the rule set's own opening position.</param>
         /// <returns>The session, or null when why not has already been reported.</returns>
-        public static Session? Open(string ruleSetPath, string folder, string? statePath)
+        /// <remarks>
+        /// A rule set that holds others is compiled with them, and their inputs are offered
+        /// here under the names its <c>uses</c> gave them — so a composite is walked, applied
+        /// to and played exactly as anything else is, and nothing below this point knows the
+        /// difference.
+        /// </remarks>
+        public static Session? Open(string ruleSetPath, string folder, string? ruleSets, string? statePath)
         {
             if (!File.Exists(ruleSetPath))
             {
@@ -52,10 +59,17 @@ namespace Rulealize.Cli
                 return null;
             }
 
+            string document = File.ReadAllText(ruleSetPath);
+
+            if (RuleSetFolder.Gather(ruleSetPath, document, ruleSets) is not RuleSetFolder held)
+            {
+                return null;
+            }
+
             RuleContext context;
             try
             {
-                context = runtime.CreateContext(File.ReadAllText(ruleSetPath));
+                context = runtime.CreateContext(document, held.Documents);
             }
             catch (RuleSetBuildException failure)
             {
