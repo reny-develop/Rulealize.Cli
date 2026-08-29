@@ -18,10 +18,13 @@ namespace Rulealize.Cli
     /// one file name rather than one per move.
     /// </para>
     /// <para>
-    /// An input is named the way <c>moves</c> prints it. Nothing parses that text: the legal
-    /// inputs are enumerated and the one whose text matches is asked for its document, so
-    /// what can be named is exactly what was offered. That leaves the one thing this cannot
-    /// express — an input that ought to be refused — to <c>--input</c> and a document.
+    /// An input is named the way <c>moves</c> prints it: the legal inputs are enumerated and
+    /// the one the text names is asked for its document, so what can be named is exactly what
+    /// was offered. The text is read far enough to tell which candidate it means — a name and
+    /// its arguments by name — and no further. Nothing is built from it, so an input the rule
+    /// set does not offer cannot be assembled here however carefully it is written, and that
+    /// one thing — an input that ought to be refused — stays with <c>--input</c> and a
+    /// document.
     /// </para>
     /// </remarks>
     internal static class ApplyCommand
@@ -144,16 +147,34 @@ namespace Rulealize.Cli
                 return null;
             }
 
+            InputShorthand? written = InputShorthand.Parse(named);
+
             foreach (ValidInput move in moves!)
             {
-                if (string.Equals(move.ToString(), named, StringComparison.Ordinal))
+                // The rendering first, which matches whatever `moves` printed however odd a
+                // value in it looks. Then the arguments by name, which is what makes the
+                // order they were written in stop mattering.
+                if (string.Equals(move.ToString(), named, StringComparison.Ordinal)
+                    || written?.Matches(move) is true)
                 {
                     return move.ToInputDocument(session.Context.RuleSet);
                 }
             }
 
-            Console.Error.WriteLine($"'{named}' is not legal from {session.Source}.");
-            Report(moves);
+            // Not "that is not legal". The list underneath is what the rule set offers, and
+            // saying illegal above a list holding the move that was named is the kind of
+            // output that sends somebody looking for a bug in their rule set. Nothing here
+            // knows whether the input is legal; what failed is the naming, so that is what
+            // this says, and where the name landed and the arguments did not it says which.
+            string? offered = written is not null
+                && moves.Any(move => string.Equals(move.Input, written.Input, StringComparison.Ordinal))
+                    ? written.Input
+                    : null;
+
+            Console.Error.WriteLine($"'{named}' does not name an input {session.Source} offers."
+                + (offered is null ? string.Empty : $" '{offered}' is, but not with those arguments."));
+
+            Report(moves, offered);
 
             // The distinction is worth drawing: a refusal that is the rule set working is not
             // the same as one that is a typo, and only a document can ask for the first.
@@ -172,7 +193,15 @@ namespace Rulealize.Cli
             }
         }
 
-        private static void Report(ValidInputSet moves)
+        /// <summary>Lists what is legal, or the one input's worth of it that was asked about.</summary>
+        /// <remarks>
+        /// Narrowing to the input named is the difference between an answer and a wall: a
+        /// rule set with five inputs over a handful of domains offers hundreds of moves, and
+        /// somebody who got one argument wrong needs to see that argument's neighbours rather
+        /// than all of them. Where the name itself was wrong there is nothing to narrow to,
+        /// and the whole list is the answer.
+        /// </remarks>
+        private static void Report(ValidInputSet moves, string? only = null)
         {
             if (moves.Count is 0)
             {
@@ -180,10 +209,13 @@ namespace Rulealize.Cli
                 return;
             }
 
-            Console.Error.WriteLine("These are:");
+            Console.Error.WriteLine(only is null ? "These are:" : $"'{only}' is offered as:");
             foreach (ValidInput move in moves)
             {
-                Console.Error.WriteLine($"  {move}");
+                if (only is null || string.Equals(move.Input, only, StringComparison.Ordinal))
+                {
+                    Console.Error.WriteLine($"  {move}");
+                }
             }
         }
 

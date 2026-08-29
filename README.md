@@ -76,14 +76,21 @@ rulealize moves reversi.json --state s1.json
 
 ## Naming an input
 
-An input is named the way `moves` prints it, and the round trip is the runtime's own:
-nothing here parses that text. The legal inputs are enumerated and the one whose text matches
-is asked for its document, so **what can be named is exactly what was offered**.
+An input is named the way `moves` prints it, and the round trip is the runtime's own: the
+legal inputs are enumerated and the one the text names is asked for its document, so **what
+can be named is exactly what was offered**. Nothing is built from the text — an input the
+rule set does not offer cannot be written into existence here.
+
+The arguments are matched by name, so they may be written in any order and spaced however
+you like. `place(at: d3)`, `place(at:d3)` and, where an input takes two,
+`assign(shift: mon-am, who: ann)` and `assign(who: ann, shift: mon-am)` are one move named
+four ways rather than four names, only one of which happens to be the runtime's.
 
 ```
 $ rulealize apply reversi.json "place(at: a1)"
-'place(at: a1)' is not legal from the initial state.
-These are:
+'place(at: a1)' does not name an input the initial state offers. 'place' is, but not with
+those arguments.
+'place' is offered as:
   place(at: e6)
   place(at: f5)
   place(at: c4)
