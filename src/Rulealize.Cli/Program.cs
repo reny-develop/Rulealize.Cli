@@ -118,5 +118,11 @@ static int Usage()
     Console.Error.WriteLine("  --outcome <file>     what was drawn, for an input that resolves something nobody chose");
     Console.Error.WriteLine("  --write              amend --state in place instead of writing to standard output");
     Console.Error.WriteLine("  --json               moves, as the runtime writes them");
+    Console.Error.WriteLine();
+
+    // The one thing about the flags above that is not readable off them: --rulesets is where
+    // restore writes as well as where everything reads, and somebody looking for where a
+    // fetched document went is looking at this list when they wonder.
+    Console.Error.WriteLine("restore fetches what `requires` and `uses` name, into --plugins and --rulesets.");
     return 2;
 }

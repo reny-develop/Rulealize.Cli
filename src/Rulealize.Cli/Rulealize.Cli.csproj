@@ -38,9 +38,14 @@
     PluginRequirement and PluginResolution come from the same package on purpose. Both are
     pure and both could have been written here, and the reason they were not is that a
     second reading of ^1.0 would eventually differ from the runtime's, and the way it would
-    show is this tool assembling a folder the runtime then refuses. RuleSetRequirement is
-    there for the same reason a version further on: what a document holds is read off the
-    document by the runtime's own reader, so the set gathered here is the set it compiles.
+    show is this tool assembling a folder the runtime then refuses.
+
+    The same holds one kind of requirement over, and 0.8.0 is where it stopped being a gap.
+    RuleSetRequirement.ReadFrom says what a document holds; Choose says which version of it
+    to take, so that "the lowest satisfying version wins" is stated once rather than once per
+    resolver; and RuleSetIdentity.ReadFrom says what arrived, without compiling it, which is
+    what a fetcher can afford while holding one document and none of the rest. Every one of
+    them could have been written here, and every one of them would have drifted.
   -->
   <ItemGroup>
     <PackageReference Include="Rulealize" Version="0.8.0" />
