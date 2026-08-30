@@ -48,6 +48,15 @@ namespace Rulealize.Cli
 
             string document = await File.ReadAllTextAsync(ruleSetPath);
 
+            // Two phases, and the order is the point. This one fills the folder: anything the
+            // document holds that is not already there is fetched from the feed and written
+            // into it, so that the gather below — which is what every other command runs, and
+            // which reads a folder and nothing else — finds a folder that is right.
+            if (!await RuleSetFetch.Into(ruleSets ?? Folder(ruleSetPath), ruleSetPath, document))
+            {
+                return 1;
+            }
+
             // What a composite draws on includes what its components draw on. `requires` is
             // the whole of what one document may use and no more, so a folder assembled from
             // the holder's alone would be one the components do not compile against.
@@ -177,6 +186,15 @@ namespace Rulealize.Cli
             Console.WriteLine($"'{ruleSetPath}' compiles against it.");
             return 0;
         }
+
+        /// <summary>Where a document's components are looked for when <c>--rulesets</c> says nothing.</summary>
+        /// <remarks>
+        /// The folder the document is in, which is <see cref="RuleSetFolder"/>'s answer too and
+        /// has to be: this writes where that reads, or a restore would fetch into one folder
+        /// and every command after it would look in another.
+        /// </remarks>
+        private static string Folder(string ruleSetPath) =>
+            Path.GetDirectoryName(ruleSetPath) is { Length: > 0 } directory ? directory : ".";
 
         private static async Task<List<Version>> ReleasedVersions(HttpClient http, string plugin)
         {

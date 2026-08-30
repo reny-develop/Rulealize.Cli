@@ -18,9 +18,10 @@ using Rulealize.Cli;
 // assemblies on disk, swept and instantiated. A vocabulary nobody publishes joins in by
 // being copied there, which is how a plugin still being written is tried.
 //
-// A rule set may hold other rule sets, and nothing publishes a document either: they are
-// files beside the one that holds them, or wherever --rulesets says. So every command here
-// works on the graph a document names rather than on the one file it was given.
+// A rule set may hold other rule sets. Those are files beside the one that holds them, or
+// wherever --rulesets says, and `restore` fetches the ones that are published into that same
+// folder. So every command here works on the graph a document names rather than on the one
+// file it was given.
 //
 // The runtime holds no state. ApplyToState is a function of the state it was handed, so
 // where a position comes from and where the next one goes are this tool's decisions and

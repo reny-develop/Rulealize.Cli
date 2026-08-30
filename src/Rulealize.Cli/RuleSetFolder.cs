@@ -11,11 +11,16 @@ namespace Rulealize.Cli
     /// <remarks>
     /// <para>
     /// A rule set's <c>uses</c> names rule sets by identifier and <c>CreateContext</c> is
-    /// handed their documents, so something has to turn the first into the second. Nothing
-    /// publishes rule set documents — they are files an author keeps beside one another —
-    /// which is why a folder of them is the seam here, the way a folder of assemblies is the
-    /// seam for vocabularies, and why the folder the document sits in is where this looks
-    /// unless <c>--rulesets</c> says otherwise.
+    /// handed their documents, so something has to turn the first into the second. A folder of
+    /// them is the seam here, the way a folder of assemblies is the seam for vocabularies, and
+    /// the folder the document sits in is where this looks unless <c>--rulesets</c> says
+    /// otherwise.
+    /// </para>
+    /// <para>
+    /// Nothing here fetches. A document an author keeps beside the one that holds it and a
+    /// document <see cref="RuleSetFetch"/> put there are the same file to this, which is what
+    /// makes <c>restore</c> the only command that has to reach the network — it fills the
+    /// folder, and everything else reads one.
     /// </para>
     /// <para>
     /// Which document answers to an identifier is read out of the document and not off its
@@ -25,11 +30,12 @@ namespace Rulealize.Cli
     /// way a plugin sweep passes over an assembly it cannot use.
     /// </para>
     /// <para>
-    /// No version is chosen here and no constraint is read. An identifier has one document in
-    /// a folder, so there is nothing to choose between, and whether the one that is there
-    /// satisfies what its holder asked for is Rulealize's reading — made where a loaded
-    /// plugin's version is made, and for the reason no version choice is made in
-    /// <c>restore</c> either.
+    /// No version is chosen here. An identifier has one document in a folder, so there is
+    /// nothing to choose between — choosing happens where a version could be had, which is
+    /// <see cref="RuleSetFetch"/>, and it is <see cref="RuleSetRequirement.Choose"/> that does
+    /// it. Whether the document that is here satisfies what its holder asked for is checked
+    /// there too, before this runs; a folder that reaches this and disagrees with itself is
+    /// one <c>restore</c> was never pointed at, and the runtime refuses it when it compiles.
     /// </para>
     /// </remarks>
     internal sealed class RuleSetFolder

@@ -9,7 +9,7 @@ dotnet tool install -g Rulealize.Cli
 
 | | |
 | --- | --- |
-| `rulealize restore <rule set>` | fetch what `requires` names, in the document and in what it holds, into a folder |
+| `rulealize restore <rule set>` | fetch what `uses` and `requires` name, through the whole graph, into folders |
 | `rulealize plugins` | what a folder of vocabularies provides, or why it provides nothing |
 | `rulealize check <rule set>` | does this document compile against that folder |
 | `rulealize moves <rule set>` | what is legal from a position |
@@ -18,7 +18,8 @@ dotnet tool install -g Rulealize.Cli
 
 ```
 --plugins <folder>   where the vocabularies are        (default 'plugin')
---rulesets <folder>  where the documents it holds are  (default the rule set's own folder)
+--rulesets <folder>  where the documents it holds are, and where restore puts the ones it
+                     fetches                          (default the rule set's own folder)
 --state <file>       the position to start from        (default the rule set's own)
 --limit <n>          candidates GetValidInputs may try (default 10000)
 --outcomes <n>       outcomes GetOutcomes may return   (default 64)
@@ -197,9 +198,13 @@ either place. The difference is that here something is willing to say so.
 ## A rule set that holds other rule sets
 
 `uses` names the rule sets a document holds, by identifier, and the runtime is handed their
-documents. Nothing publishes a rule set document — they are files an author keeps beside one
-another — so **the folder the document is in is where those are looked for**, and
+documents. **The folder the document is in is where those are looked for**, and
 `--rulesets <folder>` says where they are when they are kept somewhere else.
+
+A component may be one you wrote, sitting beside the document that holds it, or one somebody
+published. Both are files in that folder by the time anything reads it, and `restore` is what
+puts the second kind there — see [holding one you did not
+write](#holding-a-rule-set-you-did-not-write).
 
 ```
 $ rulealize check process.json
@@ -218,15 +223,65 @@ passes over an assembly it cannot use.
 both, because taking whichever the file system listed first would settle something no
 document said, and settle it quietly.
 
-**No version is chosen here and no constraint is read.** With one document per identifier
-there is nothing to choose between, and whether the one that is there satisfies what its
-holder asked for is Rulealize's reading — for the reason no version choice is made in
-`restore` either:
+**No version is chosen while reading a folder.** With one document per identifier there is
+nothing to choose between. Choosing happens where a version could be had, which is `restore`,
+and whether what is here satisfies what asked for it is Rulealize's reading either way:
 
 ```
 'process.json' does not compile against 'plugin':
   /uses[0]/version: this rule set needs counter ^1.0 as c, but 2.0.0 was supplied.
 ```
+
+## Holding a rule set you did not write
+
+A published rule set is a package whose `ruleset` folder holds one document, and **its
+identifier is the identifier of that package**. So `uses` names a package, and nothing has to
+be looked up anywhere to find it:
+
+```json
+"uses": [
+  { "ruleSet": "Rulealize.RuleSet.Request", "version": "^1.0", "as": "req" }
+]
+```
+
+`restore` fetches what that names, through the whole graph, into the folder the document
+resolves its components from:
+
+```
+$ rulealize restore roster.json
+  Rulealize.RuleSet.Request@1.0.0 -> Rulealize.RuleSet.Request.json
+1 rule set -> .
+holding 1 rule set:
+  Rulealize.RuleSet.Request@1.0.0 ('Rulealize.RuleSet.Request.json')
+  ...
+7 plugins -> plugin
+'roster.json' compiles against it.
+```
+
+**`as` is not optional for one of these.** An alias defaults to the identifier and may not
+contain a `.`, so an entry naming a package-shaped identifier without `as` is refused, with a
+message about a key you did not write.
+
+**Which version is Rulealize's answer, not this tool's.** `RuleSetRequirement.Choose` takes
+the *lowest* published version satisfying every constraint that named it — the same rule a
+`requires` is resolved by, and for the same reason: the document resolves to the same folder
+next year, when three more versions have shipped. Moving to a newer one means changing what
+the document asks for, and restoring it is not the moment to do that.
+
+**What is fetched is checked as it arrives**, against both halves of what was asked:
+
+```
+'roster.json' holds Rulealize.RuleSet.Request ^2.0 as req,
+and 'Rulealize.RuleSet.Request.json' is Rulealize.RuleSet.Request@1.0.0.
+```
+
+**A document already in the folder is never written over.** Yours and one fetched earlier
+look the same from here, and restoring is not the moment to decide which. If one that
+`restore` put there is now the wrong version, delete it and run again.
+
+**A rule set nobody publishes is not a mistake.** A component still being written is a file
+you put in that folder, and from that moment it is indistinguishable from a fetched one —
+which is the same thing the plugin folder is for, one kind of dependency over.
 
 **`restore` fetches what the whole graph requires.** `requires` is the whole of what one
 document may draw on, so a folder assembled from the holder's alone is one its components do
