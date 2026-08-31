@@ -128,7 +128,7 @@ namespace Rulealize.Cli
                     continue;
                 }
 
-                if (await Fetch(http, entry, constraints, holder, folder, declaring) is not (string file, string text))
+                if (await Fetch(http, entry, constraints, holder, folder, written, declaring) is not (string file, string text))
                 {
                     return false;
                 }
@@ -172,6 +172,7 @@ namespace Rulealize.Cli
             List<RuleSetRequirement> constraints,
             string holder,
             string folder,
+            List<string> alongside,
             Dictionary<string, string> declaring)
         {
             List<Version> published = await ReleasedVersions(http, entry.RuleSet);
@@ -184,7 +185,7 @@ namespace Rulealize.Cli
                 Console.Error.WriteLine(
                     "A rule set is published under the identifier its document declares, and is fetched by it.");
                 Console.Error.WriteLine(
-                    $"A document that nobody publishes is not a mistake — put it in '{folder}' and this will find it.");
+                    $"A document that nobody publishes is not a mistake. Put it in '{folder}' and this will find it.");
                 return null;
             }
 
@@ -202,10 +203,10 @@ namespace Rulealize.Cli
                 return null;
             }
 
-            string text;
+            IReadOnlyList<string> documents;
             try
             {
-                text = await Document(http, entry.RuleSet, version);
+                documents = await Documents(http, entry.RuleSet, version);
             }
             catch (Exception failure) when (failure is HttpRequestException or InvalidOperationException
                 or TaskCanceledException)
@@ -214,15 +215,30 @@ namespace Rulealize.Cli
                 return null;
             }
 
-            RuleSetIdentity identity;
-            try
+            List<(RuleSetIdentity Identity, string Text)> read = [];
+            foreach (string document in documents)
             {
-                identity = RuleSetIdentity.ReadFrom(text);
+                try
+                {
+                    read.Add((RuleSetIdentity.ReadFrom(document), document));
+                }
+                catch (RuleSetBuildException failure)
+                {
+                    Console.Error.WriteLine($"'{entry.RuleSet}' {version} holds something that is not a rule set:");
+                    Console.Error.WriteLine($"  {failure.Message}");
+                    return null;
+                }
             }
-            catch (RuleSetBuildException failure)
+
+            // The one that answers to the package's name. The others are its own components,
+            // shipped with it; they are written out too, because the entry point holds them and
+            // fetching only the entry point would fetch something that cannot compile.
+            if (read.FirstOrDefault(one => string.Equals(one.Identity.Id, entry.RuleSet, StringComparison.Ordinal))
+                is not (RuleSetIdentity identity, string text))
             {
-                Console.Error.WriteLine($"'{entry.RuleSet}' {version} does not hold a readable rule set:");
-                Console.Error.WriteLine($"  {failure.Message}");
+                Console.Error.WriteLine(
+                    $"'{entry.RuleSet}' {version} holds no document declaring that identifier. It holds "
+                    + $"{string.Join(", ", read.Select(one => $"'{one.Identity.Id}'"))}.");
                 return null;
             }
 
@@ -234,22 +250,52 @@ namespace Rulealize.Cli
                 }
             }
 
-            // Named for the identifier and not for whatever the package called the file, so a
-            // second restore finds it and a person reading the folder can see which of these
-            // are theirs. A file already under that name belonging to something else is not
-            // written over: it is somebody's, and this is not the moment to decide it is not.
-            string file = Path.Combine(folder, $"{identity.Id}.json");
+            string? entryFile = null;
 
-            if (File.Exists(file) && !declaring.ContainsValue(file))
+            foreach ((RuleSetIdentity one, string document) in read)
             {
-                Console.Error.WriteLine(
-                    $"'{Show(file)}' is where '{identity.Id}' would go, and something else is already there.");
-                return null;
+                // Named for the identifier and not for whatever the package called the file, so
+                // a second restore finds it and a person reading the folder can see which of
+                // these are theirs.
+                string path = Path.Combine(folder, $"{one.Id}.json");
+
+                // Already resolved from somewhere — the folder beside the document, or an
+                // earlier step of this walk. Not written over: it is somebody's, and restoring
+                // is not the moment to decide it is not.
+                if (declaring.ContainsKey(one.Id))
+                {
+                    if (string.Equals(one.Id, entry.RuleSet, StringComparison.Ordinal))
+                    {
+                        entryFile = declaring[one.Id];
+                    }
+
+                    continue;
+                }
+
+                if (File.Exists(path) && !declaring.ContainsValue(path))
+                {
+                    Console.Error.WriteLine(
+                        $"'{Show(path)}' is where '{one.Id}' would go, and something else is already there.");
+                    return null;
+                }
+
+                Directory.CreateDirectory(folder);
+                await File.WriteAllTextAsync(path, document);
+
+                if (string.Equals(one.Id, entry.RuleSet, StringComparison.Ordinal))
+                {
+                    entryFile = path;
+                }
+                else
+                {
+                    // Recorded so the walk finds it where it finds anything else, and reported
+                    // so nobody wonders where a file they did not ask for came from.
+                    declaring[one.Id] = path;
+                    alongside.Add($"{one.RuleSet} -> {Show(path)}");
+                }
             }
 
-            Directory.CreateDirectory(folder);
-            await File.WriteAllTextAsync(file, text);
-            return (file, text);
+            return (entryFile!, text);
         }
 
         private static async Task<List<Version>> ReleasedVersions(HttpClient http, string ruleSet)
@@ -275,13 +321,23 @@ namespace Rulealize.Cli
                 .Select(Version.Parse)];
         }
 
-        /// <summary>Reads the one document a rule set package distributes.</summary>
+        /// <summary>Reads every document a rule set package distributes.</summary>
         /// <remarks>
-        /// No <c>lib</c> folder and exactly one <c>.json</c> under <c>ruleset</c> is what a rule
-        /// set package is. A package holding two would need something to say which of them the
-        /// identifier meant, which is the lookup this whole convention exists to not have.
+        /// <para>
+        /// No <c>lib</c> folder, and under <c>ruleset</c> the documents. One of them declares
+        /// the package's own identifier and is what a <c>uses</c> naming this package gets;
+        /// any others are that one's own components, shipped with it because they are part of
+        /// it — the way a library's internal types ship in its assembly rather than in
+        /// packages of their own.
+        /// </para>
+        /// <para>
+        /// They are all taken, because the entry point holds them and a consumer that got only
+        /// the entry point would have fetched something that cannot compile. Which one is the
+        /// entry point is decided by the caller, from what each declares, and not from where
+        /// it sat in the archive.
+        /// </para>
         /// </remarks>
-        private static async Task<string> Document(HttpClient http, string ruleSet, Version version)
+        private static async Task<IReadOnlyList<string>> Documents(HttpClient http, string ruleSet, Version version)
         {
             string lower = ruleSet.ToLowerInvariant();
             string url = $"{FlatContainer}/{lower}/{version}/{lower}.{version}.nupkg";
@@ -289,7 +345,7 @@ namespace Rulealize.Cli
             using MemoryStream buffer = new(await http.GetByteArrayAsync(url));
             using ZipArchive archive = new(buffer);
 
-            ZipArchiveEntry[] documents =
+            ZipArchiveEntry[] entries =
             [
                 .. archive.Entries.Where(static entry =>
                     entry.FullName.StartsWith("ruleset/", StringComparison.OrdinalIgnoreCase)
@@ -297,14 +353,19 @@ namespace Rulealize.Cli
                     && entry.FullName.Count(static character => character is '/') is 1)
             ];
 
-            if (documents.Length is not 1)
+            if (entries.Length is 0)
             {
-                throw new InvalidOperationException(
-                    $"it holds {documents.Length} documents in `ruleset`, and a rule set package holds one.");
+                throw new InvalidOperationException("it holds no document in `ruleset`.");
             }
 
-            using StreamReader reader = new(documents[0].Open());
-            return await reader.ReadToEndAsync();
+            List<string> documents = [];
+            foreach (ZipArchiveEntry entry in entries)
+            {
+                using StreamReader reader = new(entry.Open());
+                documents.Add(await reader.ReadToEndAsync());
+            }
+
+            return documents;
         }
 
         // ── reading what is already here ───────────────────────────────────────────────
