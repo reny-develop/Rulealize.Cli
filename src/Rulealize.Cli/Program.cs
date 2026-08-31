@@ -18,10 +18,12 @@ using Rulealize.Cli;
 // assemblies on disk, swept and instantiated. A vocabulary nobody publishes joins in by
 // being copied there, which is how a plugin still being written is tried.
 //
-// A rule set may hold other rule sets. Those are files beside the one that holds them, or
-// wherever --rulesets says, and `restore` fetches the ones that are published into that same
-// folder. So every command here works on the graph a document names rather than on the one
-// file it was given.
+// A rule set may hold other rule sets, and those come from one of two places that are not the
+// same place. One you wrote is source, beside the document that holds it. One somebody
+// published is fetched, into 'component' or wherever --rulesets says — a folder this tool owns
+// and your history ignores, because no package manager writes a dependency into src. Both are
+// read, yours first. So every command here works on the graph a document names rather than on
+// the one file it was given.
 //
 // The runtime holds no state. ApplyToState is a function of the state it was handed, so
 // where a position comes from and where the next one goes are this tool's decisions and
@@ -37,10 +39,9 @@ if (args.Length is 0)
 
 string folder = Option("--plugins") ?? Option("--out") ?? PluginFolder.Default;
 
-// Where the documents a rule set holds are looked for. Null rather than a default folder
-// name: a rule set that holds another is written beside it, so the folder the document is
-// in is the answer until somebody says otherwise, and a document that holds nothing never
-// reads a folder at all.
+// Where a fetched component goes and is read from. Null is passed on rather than defaulted
+// here, because the folder the document sits in is read as well and only HeldFolders knows
+// both — and a document that holds nothing never reads either.
 string? ruleSets = Option("--rulesets");
 string? statePath = Option("--state");
 string? inputPath = Option("--input");
@@ -111,7 +112,7 @@ static int Usage()
     Console.Error.WriteLine("  rulealize play    <rule set>");
     Console.Error.WriteLine();
     Console.Error.WriteLine("  --plugins <folder>   where the vocabularies are        (default 'plugin')");
-    Console.Error.WriteLine("  --rulesets <folder>  where the documents it holds are  (default the rule set's own)");
+    Console.Error.WriteLine("  --rulesets <folder>  where fetched components go and are read (default 'component')");
     Console.Error.WriteLine("  --state <file>       the position to start from        (default the rule set's)");
     Console.Error.WriteLine("  --limit <n>          candidates GetValidInputs may try (default 10000)");
     Console.Error.WriteLine("  --outcomes <n>       outcomes GetOutcomes may return   (default 64)");

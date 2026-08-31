@@ -52,7 +52,7 @@ namespace Rulealize.Cli
             // document holds that is not already there is fetched from the feed and written
             // into it, so that the gather below — which is what every other command runs, and
             // which reads a folder and nothing else — finds a folder that is right.
-            if (!await RuleSetFetch.Into(ruleSets ?? Folder(ruleSetPath), ruleSetPath, document))
+            if (!await RuleSetFetch.Into(ruleSetPath, document, ruleSets))
             {
                 return 1;
             }
@@ -187,14 +187,6 @@ namespace Rulealize.Cli
             return 0;
         }
 
-        /// <summary>Where a document's components are looked for when <c>--rulesets</c> says nothing.</summary>
-        /// <remarks>
-        /// The folder the document is in, which is <see cref="RuleSetFolder"/>'s answer too and
-        /// has to be: this writes where that reads, or a restore would fetch into one folder
-        /// and every command after it would look in another.
-        /// </remarks>
-        private static string Folder(string ruleSetPath) =>
-            Path.GetDirectoryName(ruleSetPath) is { Length: > 0 } directory ? directory : ".";
 
         private static async Task<List<Version>> ReleasedVersions(HttpClient http, string plugin)
         {

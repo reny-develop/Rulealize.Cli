@@ -36,7 +36,7 @@ namespace Rulealize.Cli
         private const string FlatContainer = "https://api.nuget.org/v3-flatcontainer";
 
         /// <summary>Fetches what the graph under a document names and the folder does not hold.</summary>
-        /// <param name="folder">Where held documents are resolved from, and where these are written.</param>
+        /// <param name="ruleSets">What <c>--rulesets</c> said, or null for the folder this tool owns.</param>
         /// <param name="ruleSetPath">The document that was asked about, for messages.</param>
         /// <param name="ruleSetDocument">Its text.</param>
         /// <returns><see langword="false"/> when something could not be had, and why is reported.</returns>
@@ -47,7 +47,7 @@ namespace Rulealize.Cli
         /// checked against what was fetched rather than sending the walk round again — the
         /// answer is the same and the message says which two entries disagree.
         /// </remarks>
-        public static async Task<bool> Into(string folder, string ruleSetPath, string ruleSetDocument)
+        public static async Task<bool> Into(string ruleSetPath, string ruleSetDocument, string? ruleSets)
         {
             if (Uses(ruleSetPath, ruleSetDocument) is not IReadOnlyList<RuleSetRequirement> uses)
             {
@@ -59,7 +59,9 @@ namespace Rulealize.Cli
                 return true;
             }
 
-            if (Declared(folder) is not Dictionary<string, string> declaring)
+            string folder = HeldFolders.Writing(ruleSets);
+
+            if (Declared(HeldFolders.Reading(ruleSetPath, ruleSets)) is not Dictionary<string, string> declaring)
             {
                 return false;
             }
@@ -314,31 +316,44 @@ namespace Rulealize.Cli
         /// reader refuses is passed over: a folder of rule sets holds the states and outcomes
         /// written beside them, and neither is a mistake to find.
         /// </remarks>
-        private static Dictionary<string, string>? Declared(string folder)
+        private static Dictionary<string, string>? Declared(IReadOnlyList<string> folders)
         {
             Dictionary<string, string> declaring = new(StringComparer.Ordinal);
 
-            if (!Directory.Exists(folder))
+            foreach (string folder in folders)
             {
-                return declaring;
-            }
-
-            foreach (string path in Directory.EnumerateFiles(folder, "*.json"))
-            {
-                if (Identity(path) is not RuleSetIdentity identity)
+                if (!Directory.Exists(folder))
                 {
                     continue;
                 }
 
-                if (declaring.TryGetValue(identity.Id, out string? taken))
+                Dictionary<string, string> here = new(StringComparer.Ordinal);
+
+                foreach (string path in Directory.EnumerateFiles(folder, "*.json"))
                 {
-                    Console.Error.WriteLine($"Two documents in '{folder}' declare '{identity.Id}':");
-                    Console.Error.WriteLine($"  {Show(taken)}");
-                    Console.Error.WriteLine($"  {Show(path)}");
-                    return null;
+                    if (Identity(path) is not RuleSetIdentity identity)
+                    {
+                        continue;
+                    }
+
+                    if (here.TryGetValue(identity.Id, out string? taken))
+                    {
+                        Console.Error.WriteLine($"Two documents in '{folder}' declare '{identity.Id}':");
+                        Console.Error.WriteLine($"  {Show(taken)}");
+                        Console.Error.WriteLine($"  {Show(path)}");
+                        return null;
+                    }
+
+                    here[identity.Id] = path;
                 }
 
-                declaring[identity.Id] = path;
+                // Nearest first, and the first folder is the document's own — so a component
+                // you are writing is what a restore finds, and the published one of the same
+                // name is neither fetched over it nor fetched at all.
+                foreach ((string id, string path) in here)
+                {
+                    _ = declaring.TryAdd(id, path);
+                }
             }
 
             return declaring;

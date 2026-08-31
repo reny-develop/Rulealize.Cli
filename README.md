@@ -18,8 +18,8 @@ dotnet tool install -g Rulealize.Cli
 
 ```
 --plugins <folder>   where the vocabularies are        (default 'plugin')
---rulesets <folder>  where the documents it holds are, and where restore puts the ones it
-                     fetches                          (default the rule set's own folder)
+--rulesets <folder>  where fetched components go and are read from
+                     (default 'component'; your own sit beside the document)
 --state <file>       the position to start from        (default the rule set's own)
 --limit <n>          candidates GetValidInputs may try (default 10000)
 --outcomes <n>       outcomes GetOutcomes may return   (default 64)
@@ -198,13 +198,21 @@ either place. The difference is that here something is willing to say so.
 ## A rule set that holds other rule sets
 
 `uses` names the rule sets a document holds, by identifier, and the runtime is handed their
-documents. **The folder the document is in is where those are looked for**, and
-`--rulesets <folder>` says where they are when they are kept somewhere else.
+documents. They come from **two folders, and the distinction is the point**:
 
-A component may be one you wrote, sitting beside the document that holds it, or one somebody
-published. Both are files in that folder by the time anything reads it, and `restore` is what
-puts the second kind there — see [holding one you did not
-write](#holding-a-rule-set-you-did-not-write).
+| | |
+| --- | --- |
+| beside the document that holds it | one **you wrote**. Source, in your repository, and nothing here writes to it |
+| `component/`, or `--rulesets <folder>` | one somebody **published**. Fetched, in a folder this tool owns and your history ignores |
+
+**Yours wins.** A document beside the one that holds it shadows a published one of the same
+identifier, because a component you are writing is the one you meant — and it is not fetched
+over, or fetched at all.
+
+That split is why `restore` does not write next to your sources. No package manager puts a
+dependency in `src`, and for a rule set published from an ordinary repository the folder next
+to the document is also the folder being packed — so fetching there meant the next
+`dotnet pack` shipped somebody else's rule sets inside yours. Until 0.9.0 it did.
 
 ```
 $ rulealize check process.json
@@ -244,19 +252,21 @@ be looked up anywhere to find it:
 ]
 ```
 
-`restore` fetches what that names, through the whole graph, into the folder the document
-resolves its components from:
+`restore` fetches what that names, through the whole graph, into `component/`:
 
 ```
 $ rulealize restore roster.json
-  Rulealize.RuleSet.Request@1.0.0 -> Rulealize.RuleSet.Request.json
-1 rule set -> .
+  Rulealize.RuleSet.Request@1.0.0 -> component\Rulealize.RuleSet.Request.json
+1 rule set -> component
 holding 1 rule set:
-  Rulealize.RuleSet.Request@1.0.0 ('Rulealize.RuleSet.Request.json')
+  Rulealize.RuleSet.Request@1.0.0 ('component\Rulealize.RuleSet.Request.json')
   ...
 7 plugins -> plugin
 'roster.json' compiles against it.
 ```
+
+`component/` and `plugin/` are both this tool's and belong in your ignore file. Neither holds
+anything you wrote.
 
 **`as` is not optional for one of these.** An alias defaults to the identifier and may not
 contain a `.`, so an entry naming a package-shaped identifier without `as` is refused, with a
@@ -275,13 +285,15 @@ the document asks for, and restoring it is not the moment to do that.
 and 'Rulealize.RuleSet.Request.json' is Rulealize.RuleSet.Request@1.0.0.
 ```
 
-**A document already in the folder is never written over.** Yours and one fetched earlier
-look the same from here, and restoring is not the moment to decide which. If one that
-`restore` put there is now the wrong version, delete it and run again.
+**A document already there is never written over**, in either folder. If one that `restore`
+put in `component/` is now the wrong version, delete it and run again — or delete the folder,
+which is the whole of what it means for it to be derived.
 
 **A rule set nobody publishes is not a mistake.** A component still being written is a file
-you put in that folder, and from that moment it is indistinguishable from a fetched one —
-which is the same thing the plugin folder is for, one kind of dependency over.
+beside the document that holds it, and it is found without being fetched, mentioned or
+configured. That is the case the two folders exist to keep separate: the plugin folder can be
+one folder because an unpublished vocabulary arrives there as a build output, and an
+unpublished rule set is source.
 
 **`restore` fetches what the whole graph requires.** `requires` is the whole of what one
 document may draw on, so a folder assembled from the holder's alone is one its components do

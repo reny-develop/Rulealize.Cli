@@ -81,11 +81,14 @@ namespace Rulealize.Cli
                 return Nothing;
             }
 
-            string where = folder ?? Folder(ruleSetPath);
+            IReadOnlyList<string> where = HeldFolders.Reading(ruleSetPath, folder);
 
-            if (!Directory.Exists(where))
+            if (where.All(directory => !Directory.Exists(directory)))
             {
-                Console.Error.WriteLine($"'{ruleSetPath}' holds other rule sets, and '{where}' does not exist.");
+                Console.Error.WriteLine(
+                    $"'{ruleSetPath}' holds other rule sets, and neither {string.Join(" nor ", where.Select(Quoted))} exists.");
+                Console.Error.WriteLine();
+                Console.Error.WriteLine("`rulealize restore` fetches the published ones into the second.");
                 return null;
             }
 
@@ -130,7 +133,9 @@ namespace Rulealize.Cli
 
             if (missing.Count is not 0)
             {
-                Console.Error.WriteLine($"'{ruleSetPath}' holds rule sets that are not in '{where}':");
+                Console.Error.WriteLine(
+                    $"'{ruleSetPath}' holds rule sets that are in neither "
+                    + $"{string.Join(" nor ", where.Select(Quoted))}:");
                 foreach (RuleSetRequirement unfound in missing)
                 {
                     Console.Error.WriteLine($"  {unfound}");
@@ -138,9 +143,11 @@ namespace Rulealize.Cli
 
                 Console.Error.WriteLine();
                 Console.Error.WriteLine(
-                    "A held rule set is a document in that folder declaring that identifier, and");
+                    "A held rule set is a document declaring that identifier. `rulealize restore` fetches");
                 Console.Error.WriteLine(
-                    "--rulesets <folder> says where to look when they are kept somewhere else.");
+                    "a published one; one you are writing is a file beside the document that holds it, and");
+                Console.Error.WriteLine(
+                    "--rulesets <folder> moves where the fetched ones go.");
                 return null;
             }
 
@@ -184,35 +191,58 @@ namespace Rulealize.Cli
         private static string Folder(string ruleSetPath) =>
             Path.GetDirectoryName(ruleSetPath) is { Length: > 0 } directory ? directory : ".";
 
-        private static Dictionary<string, Document>? Index(string folder)
+        /// <summary>Which document answers to an identifier, over the folders in order.</summary>
+        /// <remarks>
+        /// The first folder wins, and it is the one the document sits in — a component you are
+        /// writing shadows a published one of the same name, because it is the one you meant.
+        /// Two in <em>one</em> folder is still a refusal: there is no order there to prefer by,
+        /// and taking whichever the file system listed first would settle something no document
+        /// said, and settle it quietly.
+        /// </remarks>
+        private static Dictionary<string, Document>? Index(IReadOnlyList<string> folders)
         {
             Dictionary<string, Document> index = new(StringComparer.Ordinal);
 
-            foreach (string path in Directory.EnumerateFiles(folder, "*.json"))
+            foreach (string folder in folders)
             {
-                if (Identity(path) is not (string id, string version, string text))
+                if (!Directory.Exists(folder))
                 {
                     continue;
                 }
 
-                string shown = Show(path);
+                Dictionary<string, Document> here = new(StringComparer.Ordinal);
 
-                if (index.TryGetValue(id, out Document taken))
+                foreach (string path in Directory.EnumerateFiles(folder, "*.json"))
                 {
-                    // An identifier has one document, the way it has one owner everywhere
-                    // else. Taking whichever the file system listed first would settle
-                    // something no document said, and settle it quietly.
-                    Console.Error.WriteLine($"Two documents in '{folder}' declare '{id}':");
-                    Console.Error.WriteLine($"  {taken.Path}");
-                    Console.Error.WriteLine($"  {shown}");
-                    return null;
+                    if (Identity(path) is not (string id, string version, string text))
+                    {
+                        continue;
+                    }
+
+                    string shown = Show(path);
+
+                    if (here.TryGetValue(id, out Document taken))
+                    {
+                        Console.Error.WriteLine($"Two documents in '{folder}' declare '{id}':");
+                        Console.Error.WriteLine($"  {taken.Path}");
+                        Console.Error.WriteLine($"  {shown}");
+                        return null;
+                    }
+
+                    here[id] = new Document(shown, version, text);
                 }
 
-                index[id] = new Document(shown, version, text);
+                foreach ((string id, Document document) in here)
+                {
+                    // Nearest first, so a later folder never displaces an earlier one.
+                    _ = index.TryAdd(id, document);
+                }
             }
 
             return index;
         }
+
+        private static string Quoted(string folder) => $"'{folder}'";
 
         private static (string Id, string Version, string Text)? Identity(string path)
         {

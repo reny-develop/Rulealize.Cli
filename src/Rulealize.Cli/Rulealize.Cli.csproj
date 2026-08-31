@@ -17,7 +17,7 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>rulealize</ToolCommandName>
     <PackageId>Rulealize.Cli</PackageId>
-    <Version>0.8.0</Version>
+    <Version>0.9.0</Version>
     <Authors>Reny</Authors>
     <Description>Runs a Rulealize rule set from a command line: restore the plugins it requires, report what a plugin folder provides, and check, list the legal inputs, apply one, or walk it interactively — a rule set that holds other rule sets included.</Description>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
