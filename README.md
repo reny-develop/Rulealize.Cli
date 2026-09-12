@@ -28,6 +28,9 @@ dotnet tool install -g Rulealize.Cli
 --json               moves, as the runtime writes them
 ```
 
+`--out` named the plugin folder in 0.1.0 and is `--plugins` from 0.2.0. From 0.11.0 the old
+name is refused rather than ignored, so a command line that still carries it says so.
+
 Requires `net10.0` and the .NET SDK, which a `dotnet tool` implies.
 
 ## Trying a rule set

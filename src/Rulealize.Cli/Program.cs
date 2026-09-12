@@ -37,7 +37,16 @@ if (args.Length is 0)
     return Usage();
 }
 
-string folder = Option("--plugins") ?? Option("--out") ?? PluginFolder.Default;
+// --out named this folder in 0.1.0 and became --plugins in 0.2.0. Passing it is an error
+// rather than nothing, because a flag no command reads is dropped in silence and the run would
+// go to the default folder as though that folder had been asked for.
+if (args.Contains("--out"))
+{
+    Console.Error.WriteLine("--out was renamed --plugins in 0.2.0.");
+    return 2;
+}
+
+string folder = Option("--plugins") ?? PluginFolder.Default;
 
 // Where a fetched component goes and is read from. Null is passed on rather than defaulted
 // here, because the folder the document sits in is read as well and only HeldFolders knows
