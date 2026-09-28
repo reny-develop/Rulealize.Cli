@@ -30,7 +30,19 @@ namespace Rulealize.Cli
 
             try
             {
-                return new RuleRuntime().LoadPluginsFrom(folder);
+                RuleRuntime runtime = new RuleRuntime().LoadPluginsFrom(folder);
+
+                // A sweep passes over what it cannot use, which is right for the assemblies a
+                // folder like this happens to hold and wrong for a plugin. Said here rather
+                // than in each command, because every one of them loads through this and the
+                // news is the same whichever asked: the file is there and it did not load, so
+                // the rule set that wants it is about to say it is missing.
+                foreach (SkippedPlugin skipped in runtime.Skipped)
+                {
+                    Console.Error.WriteLine($"'{skipped.File}' was passed over: {skipped.Reason}");
+                }
+
+                return runtime;
             }
             catch (PluginLoadException failure)
             {

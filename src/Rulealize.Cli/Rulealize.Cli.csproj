@@ -17,7 +17,7 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>rulealize</ToolCommandName>
     <PackageId>Rulealize.Cli</PackageId>
-    <Version>0.11.0</Version>
+    <Version>0.12.0</Version>
     <Authors>Reny</Authors>
     <Description>Runs a Rulealize rule set from a command line: restore the plugins it requires and the rule sets it uses, report what a plugin folder provides, and check, list the legal inputs, apply one, or walk it interactively — a rule set that holds other rule sets included.</Description>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
@@ -48,7 +48,7 @@
     them could have been written here, and every one of them would have drifted.
   -->
   <ItemGroup>
-    <PackageReference Include="Rulealize" Version="0.9.0" />
+    <PackageReference Include="Rulealize" Version="0.10.0" />
   </ItemGroup>
 
 </Project>

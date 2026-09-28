@@ -342,10 +342,12 @@ the one a rule set will be compiled against. **An operation that was written but
 registered is missing from it**, which is the cheapest way there is to find a forgotten
 `AddExpression`.
 
-When a folder holds assemblies and yields no vocabulary, the runtime does not say why — a
-sweep is speculative, since pointing one at an application's own output must not be an
-error, so a type it cannot use is passed over in silence. That is right for the runtime and
-useless here, where somebody asked on purpose. So this asks again, itself:
+When a folder holds assemblies and yields no vocabulary, the runtime says why only for the
+one case it can be sure about — an assembly built against `Rulealize.Abstraction` whose types
+will not load, which it names along with both versions. Anything else is passed over in
+silence, because a sweep is speculative and pointing one at an application's own output must
+not be an error. That is right for the runtime and not enough here, where somebody asked on
+purpose. So this asks again, itself:
 
 ```
 notpublic
