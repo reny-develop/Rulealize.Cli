@@ -7,7 +7,7 @@ using Rulealize.Cli;
 // Runs a Rulealize rule set from a command line, so that trying one does not begin with
 // writing a host.
 //
-//   rulealize restore <rule set>            fetch what `requires` names, into a folder
+//   rulealize restore <rule set>            fetch what `requires` and `uses` name, into folders
 //   rulealize plugins                       what a folder of vocabularies provides
 //   rulealize check   <rule set>            does this document compile against it
 //   rulealize moves   <rule set>            what is legal from a position

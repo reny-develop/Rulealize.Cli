@@ -13,14 +13,13 @@ dotnet tool install -g Rulealize.Cli
 | `rulealize plugins` | what a folder of vocabularies provides, or why it provides nothing |
 | `rulealize check <rule set>` | does this document compile against that folder |
 | `rulealize moves <rule set>` | what is legal from a position |
-| `rulealize apply <rule set> <input>` | apply one, and write the state it reached |
+| `rulealize apply <rule set> <input>` &#124; `--input <file>` | apply one, and write the state it reached |
 | `rulealize play <rule set>` | walk it, holding the position in memory |
 
 ```
 --plugins <folder>   where the vocabularies are        (default 'plugin')
---rulesets <folder>  where fetched components go and are read from
-                     (default 'component'; your own sit beside the document)
---state <file>       the position to start from        (default the rule set's own)
+--rulesets <folder>  where fetched components go and are read (default 'component')
+--state <file>       the position to start from        (default the rule set's)
 --limit <n>          candidates GetValidInputs may try (default 10000)
 --outcomes <n>       outcomes GetOutcomes may return   (default 64)
 --outcome <file>     what was drawn, for an input that resolves something nobody chose
@@ -92,17 +91,19 @@ four ways rather than four names, only one of which happens to be the runtime's.
 
 ```
 $ rulealize apply reversi.json "place(at: a1)"
-'place(at: a1)' does not name an input the initial state offers. 'place' is, but not with
-those arguments.
+'place(at: a1)' does not name an input the initial state offers. 'place' is, but not with those arguments.
 'place' is offered as:
   place(at: e6)
   place(at: f5)
   place(at: c4)
   place(at: d3)
+
+To apply something the rule set refuses -- to check that it does -- write the
+input document and pass --input <file>.
 ```
 
-Which leaves the one thing this cannot express — an input the rule set ought to refuse, and
-checking that it does — to `--input <file>` and a written document.
+Which is the one thing this cannot express — an input the rule set ought to refuse, and
+checking that it does — so it says where to go for it.
 
 ## When nobody chooses the next state
 
@@ -158,8 +159,9 @@ that wants one. That is the same arrangement either way, which is why neither co
 
 **A rule set with no chance in it notices none of this.** An input that draws nothing has
 exactly one outcome, of probability one, so `apply` needs no `--outcome` and `play` never
-asks. Both commands call `GetOutcomes` regardless; there is no branch here for chance,
-because there is none in the runtime either.
+asks. `play` calls `GetOutcomes` for every move it makes; `apply` applies the input and only
+reaches `GetOutcomes` when the runtime says the input draws. Neither branches on whether the
+rule set has chance in it, because that is not a property a rule set has — an input does.
 
 ## `moves`
 
@@ -245,9 +247,10 @@ and whether what is here satisfies what asked for it is Rulealize's reading eith
 
 ## Holding a rule set you did not write
 
-A published rule set is a package whose `ruleset` folder holds one document, and **its
-identifier is the identifier of that package**. So `uses` names a package, and nothing has to
-be looked up anywhere to find it:
+A published rule set is a package whose `ruleset` folder holds a document declaring **the
+identifier of that package** — and, where the rule set is built out of parts, those beside it,
+each named under the same identifier. So `uses` names a package, exactly one document in it
+answers to that name, and nothing has to be looked up anywhere to find it:
 
 ```json
 "uses": [
@@ -339,10 +342,12 @@ the one a rule set will be compiled against. **An operation that was written but
 registered is missing from it**, which is the cheapest way there is to find a forgotten
 `AddExpression`.
 
-When a folder holds assemblies and yields no vocabulary, the runtime does not say why — a
-sweep is speculative, since pointing one at an application's own output must not be an
-error, so a type it cannot use is passed over in silence. That is right for the runtime and
-useless here, where somebody asked on purpose. So this asks again, itself:
+When a folder holds assemblies and yields no vocabulary, the runtime says why only for the
+one case it can be sure about — an assembly built against `Rulealize.Abstraction` whose types
+will not load, which it names along with both versions. Anything else is passed over in
+silence, because a sweep is speculative and pointing one at an application's own output must
+not be an error. That is right for the runtime and not enough here, where somebody asked on
+purpose. So this asks again, itself:
 
 ```
 notpublic
@@ -367,8 +372,7 @@ The same compile `restore` ends with, on its own and without the network.
 
 ```
 'typo.json' does not compile against 'plugin':
-  /inputs/measure/effects[0]/value: 'my.lenght' is not an operation any loaded plugin
-  provides. Check the rule set's 'requires'.
+  /inputs/measure/effects[0]/value: 'my.lenght' is not an operation any loaded plugin provides. Check the rule set's 'requires'.
 ```
 
 Restoring is something a document needs once. This is the question asked after every edit,
@@ -415,10 +419,15 @@ Two rules come with that, and neither is this tool's to change:
 the published versions of a plugin the document already named, and the feed answers that; the
 registry's catalogue is for finding a plugin you could not already name.
 
-**The SDK does the fetching**, with the versions pinned exactly so that delegating decides
-nothing. NuGet then gets target frameworks and a plugin's own dependencies right — which this
-could only approximate — and what lands in the folder is what `dotnet publish` would have put
-there, which is the arrangement a deployed application actually has.
+**The SDK does the fetching for plugins**, with the versions pinned exactly so that
+delegating decides nothing. NuGet then gets target frameworks and a plugin's own dependencies
+right — which this could only approximate — and what lands in the folder is what
+`dotnet publish` would have put there, which is the arrangement a deployed application
+actually has.
+
+A rule-set package is fetched by this tool instead, over HTTP. What is wanted from one is a
+JSON document out of its `ruleset` folder, not an assembly resolved against a target
+framework, so there is nothing for the SDK to get right that reading the package does not.
 
 ## What it will not do
 
