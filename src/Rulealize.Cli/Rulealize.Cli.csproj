@@ -48,7 +48,7 @@
     them could have been written here, and every one of them would have drifted.
   -->
   <ItemGroup>
-    <PackageReference Include="Rulealize" Version="0.10.0" />
+    <PackageReference Include="Rulealize" Version="0.11.0" />
   </ItemGroup>
 
 </Project>
